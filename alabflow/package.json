@@ -1,0 +1,73 @@
+{
+  "name": "alabflow",
+  "version": "0.1.1",
+  "private": true,
+  "dependencies": {
+    "@babel/plugin-transform-numeric-separator": "^7.24.1",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "14.1.0",
+    "@tippyjs/react": "^4.2.6",
+    "@types/jest": "^27.5.2",
+    "@types/node": "17.0.23",
+    "@types/react": "^18.2.12",
+    "@types/react-dom": "^18.2.5",
+    "@types/uuid": "^9.0.2",
+    "axios": "^1.4.0",
+    "chart.js": "^4.4.7",
+    "framer-motion": "^11.15.0",
+    "jwt-decode": "^3.1.2",
+    "meilisearch": "^0.34.1",
+    "patch-package": "^8.0.0",
+    "react": "^18.2.0",
+    "react-bootstrap-icons": "^1.10.3",
+    "react-chartjs-2": "^5.2.0",
+    "react-clock": "^5.1.0",
+    "react-cookie": "^4.1.1",
+    "react-date-picker": "^10.5.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-ios-time-picker": "^0.2.2",
+    "react-router-dom": "^6.13.0",
+    "react-scripts": "^5.0.1",
+    "react-select": "^5.7.5",
+    "react-time-picker": "^6.6.0",
+    "react-transition-group": "^4.4.5",
+    "tw-elements": "git+https://oauth2:2xzvemUbx1-dxK58K21n@git.mdbootstrap.com/mdb/twe-standard/prd/tw-elements-pro-advanced.git",
+    "typescript": "^4.9.5",
+    "uuid": "^9.0.1",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "find-methods": "node src/scripts/find-unused-methods.js",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@types/react-transition-group": "^4.4.6",
+    "cypress": "^14.0.3",
+    "cypress-file-upload": "^5.0.8",
+    "eslint-plugin-cypress": "^4.1.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "fork-ts-checker-webpack-plugin": "^9.0.2",
+    "tailwindcss": "^3.3.2"
+  }
+}

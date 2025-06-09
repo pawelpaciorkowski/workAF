@@ -1,0 +1,202 @@
+stages:
+  - build
+  - release
+  - deploy
+
+build_staging:
+  stage: build
+  image: node:20-alpine
+  tags:
+    - "nodejs"
+  only:
+    - "staging"
+  variables:
+    NODE_ENV: "staging"
+    CI: "false"
+  before_script:
+    - apk update && apk add git
+    - cd alabflow && npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - alabflow/build
+      - deployment/staging
+
+release_staging:
+  stage: release
+  tags:
+    - "shell"
+  only:
+    - "staging"
+  variables:
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - docker version
+    - docker info
+  script:
+    - "docker build -t ${REGISTRY_ADDRESS}/alabflow_staging_react:latest -f staging/Dockerfile ."
+    - "docker push ${REGISTRY_ADDRESS}/alabflow_staging_react:latest"
+
+deploy_staging:
+  stage: deploy
+  tags:
+    - "nodejs"
+  only:
+    - "staging"
+  variables:
+    DEPLOYMENT_USER: "dev"
+    DEPLOYMENT_MACHINE: "10.1.252.81"
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - 'which ssh-agent || ( apk update && apk add openssh-client )'
+    - eval $(ssh-agent -s)
+    - echo "$DEPLOY_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan ${DEPLOYMENT_MACHINE} >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - "ssh ${DEPLOYMENT_USER}@${DEPLOYMENT_MACHINE} << ENDSSH"
+    - |
+      docker network inspect alabflow_backend >/dev/null 2>&1 || docker network create --driver bridge alabflow_backend
+      docker pull ${REGISTRY_ADDRESS}/alabflow_staging_react:latest &&
+      docker stop alabflow_staging_react || true && docker container rm -f alabflow_staging_react || true &&
+      docker container run -d -t --name alabflow_staging_react \
+      -p 8880:80 \
+      --restart unless-stopped \
+      --network alabflow_backend_staging \
+      ${REGISTRY_ADDRESS}/alabflow_staging_react:latest
+    - exit
+
+build_development:
+  stage: build
+  image: node:20-alpine
+  tags:
+    - "nodejs"
+  only:
+    - "development"
+  variables:
+    NODE_ENV: "development"
+    CI: "false"
+  before_script:
+    - apk update && apk add git
+    - cd alabflow && npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - alabflow/build
+      - deployment/development
+
+release_development:
+  stage: release
+  tags:
+    - "shell"
+  only:
+    - "development"
+  variables:
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - docker version
+    - docker info
+  script:
+    - "docker build -t ${REGISTRY_ADDRESS}/alabflow_development_react:latest -f deployment/development/Dockerfile ."
+    - "docker push ${REGISTRY_ADDRESS}/alabflow_development_react:latest"
+
+deploy_development:
+  stage: deploy
+  tags:
+    - "nodejs"
+  only:
+    - "development"
+  variables:
+    DEPLOYMENT_USER: "dev"
+    DEPLOYMENT_MACHINE: "10.1.252.81"
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - 'which ssh-agent || ( apk update && apk add openssh-client )'
+    - eval $(ssh-agent -s)
+    - echo "$DEPLOY_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan ${DEPLOYMENT_MACHINE} >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - "ssh ${DEPLOYMENT_USER}@${DEPLOYMENT_MACHINE} << ENDSSH"
+    - |
+      docker network inspect alabflow_backend_test >/dev/null 2>&1 || docker network create --driver bridge alabflow_backend_test
+      docker pull ${REGISTRY_ADDRESS}/alabflow_development_react:latest &&
+      docker stop alabflow_development_react || true && docker container rm -f alabflow_development_react || true &&
+      docker container run -d -t --name alabflow_development_react \
+      -p 8888:80 \
+      --restart unless-stopped \
+      --network alabflow_backend_test \
+      ${REGISTRY_ADDRESS}/alabflow_development_react:latest
+    - exit
+
+build_production:
+  stage: build
+  image: node:20-alpine
+  tags:
+    - "nodejs"
+  only:
+    - "main"
+  variables:
+    NODE_ENV: "production"
+    CI: "false"
+  before_script:
+    - apk update && apk add git
+    - cd alabflow && npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - alabflow/build
+      - deployment/production
+
+release_production:
+  stage: release
+  tags:
+    - "shell"
+  only:
+    - "main"
+  variables:
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - docker version
+    - docker info
+  script:
+    - "docker build -t ${REGISTRY_ADDRESS}/alabflow_production_react:latest -f production/Dockerfile ."
+    - "docker push ${REGISTRY_ADDRESS}/alabflow_production_react:latest"
+
+deploy_production:
+  stage: deploy
+  tags:
+    - "nodejs"
+  only:
+    - "main"
+  variables:
+    DEPLOYMENT_USER: "dev"
+    DEPLOYMENT_MACHINE: "10.1.252.81"
+    REGISTRY_ADDRESS: "10.1.1.85:5001"
+  before_script:
+    - 'which ssh-agent || ( apk update && apk add openssh-client )'
+    - eval $(ssh-agent -s)
+    - echo "$DEPLOY_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan ${DEPLOYMENT_MACHINE} >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - "ssh ${DEPLOYMENT_USER}@${DEPLOYMENT_MACHINE} << ENDSSH"
+    - |
+      docker network inspect alabflow_backend >/dev/null 2>&1 || docker network create --driver bridge alabflow_backend
+      docker pull ${REGISTRY_ADDRESS}/alabflow_production_react:latest &&
+      docker stop alabflow_production_react || true && docker container rm -f alabflow_production_react || true &&
+      docker container run -d -t --name alabflow_production_react \
+      -p 8008:80 \
+      --restart unless-stopped \
+      --network alabflow_backend_production \
+      ${REGISTRY_ADDRESS}/alabflow_production_react:latest
+    - exit
