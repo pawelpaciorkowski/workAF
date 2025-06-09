@@ -11,7 +11,11 @@ export const FlowApiProvider = ({ children }: { children: React.ReactNode }) => 
     const { addAlert } = useAlerts();
     const [flowData, setFlowData] = useState<any>(null)
     const [flowClientGroups, setFlowClientGroups] = useState<any>([]);
-    const flowAPI = new FlowAPI(authData, refreshToken, addAlert)
+
+    const flowAPI = useMemo(() => {
+        return new FlowAPI(authData, refreshToken, addAlert);
+    }, [authData, refreshToken, addAlert]);
+
 
     const getFlowClientGroups = () => {
         if (flowClientGroups.length === 0) {
@@ -33,7 +37,7 @@ export const FlowApiProvider = ({ children }: { children: React.ReactNode }) => 
                 getFlowClientGroups
             }
         },
-        [addAlert, authData, flowData]
+        [flowData, flowAPI, flowClientGroups]
     );
 
     return (

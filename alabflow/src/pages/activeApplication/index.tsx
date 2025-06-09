@@ -1,9 +1,11 @@
+// alabflow/src/pages/activeApplication/index.tsx
+
 import React, { useEffect, useState } from "react";
 import AdvancedTable from "../../globalComponents/advancedTable";
 import { Modal } from "../../pages/flow/list/processList/confirmModal";
-import { ArrowClockwise, InfoCircle, InfoCircleFill } from "react-bootstrap-icons";
+import { ArrowClockwise } from "react-bootstrap-icons";
 import { useFlowApi } from "../../_hooks/flowAPI";
-import { useAuth } from "../../_hooks/auth";
+import { useAuth } from "../../_hooks/auth"; // << 1. Import useAuth
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
@@ -21,26 +23,14 @@ const statusColorMap: { [key: string]: string } = {
   "w trakcie uzupełniania przez inny dział": "text-purple-500",
 };
 
-
-const renderStatusesTooltip = (statuses: any[], flowId: number, currentUserDepartmentUUID?: string) => {
-  const filteredStatuses = statuses.filter((status) => {
-    const dept = status.department;
-    const statusName = (status.flowStatus?.name || status.name || "").toLowerCase();
-
-    // Jeśli departament użytkownika = status.departamentu => pokaż wszystko
-    if (dept?.uuid === currentUserDepartmentUUID) return true;
-
-    // W przeciwnym wypadku pokazuj tylko "zatwierdzony"
-    return statusName === "zatwierdzony";
-  });
-
+const renderStatusesTooltip = (statuses: any[], flowId: number) => {
   return (
     <div className="p-4 max-w-lg text-lg">
       <h2 className="text-xl font-bold mb-2">
         Status wniosku {flowId} dla departamentów:
       </h2>
       <ul className="space-y-2">
-        {filteredStatuses.map((status, index) => {
+        {statuses.map((status, index) => {
           const statusName = status.flowStatus?.name || status.name || "Nieznany";
           const statusColor = statusColorMap[statusName.toLowerCase()] || "text-gray-500";
 
@@ -50,7 +40,6 @@ const renderStatusesTooltip = (statuses: any[], flowId: number, currentUserDepar
                 {statusName}
               </strong>{" "}
               – {status.department?.name || "Brak departamentu"}
-              {status.isEditable && " (Edycyjny)"}
             </li>
           );
         })}
@@ -59,10 +48,43 @@ const renderStatusesTooltip = (statuses: any[], flowId: number, currentUserDepar
   );
 };
 
+// << 2. Nowa funkcja do określania statusu do wyświetlenia
+const determineDisplayStatus = (statuses: any[], userDepartmentId: number | null) => {
+  if (!statuses || statuses.length === 0) {
+    return { flowStatus: "Brak statusu", department: "Brak danych" };
+  }
 
+  // Priorytet 1: Znajdź status dla działu zalogowanego użytkownika, jeśli jest aktywny
+  if (userDepartmentId) {
+    const userSpecificStatus = statuses.find(
+      (s) => s.department?.id === userDepartmentId && s.flowStatus?.isEditable
+    );
+    if (userSpecificStatus) {
+      return {
+        flowStatus: userSpecificStatus.flowStatus.name,
+        department: userSpecificStatus.department.name,
+      };
+    }
+  }
 
+  // Priorytet 2: Znajdź pierwszy status "nowy" lub "w trakcie"
+  const firstActiveStatus = statuses.find(
+    (s) => s.flowStatus?.isEditable
+  );
+  if (firstActiveStatus) {
+    return {
+      flowStatus: firstActiveStatus.flowStatus.name,
+      department: firstActiveStatus.department.name,
+    };
+  }
 
-
+  // Priorytet 3: Jeśli wszystko jest zatwierdzone, pokaż ostatni status (prawdopodobnie "zatwierdzony")
+  const lastStatus = statuses[statuses.length - 1];
+  return {
+    flowStatus: lastStatus.flowStatus.name,
+    department: lastStatus.department.name,
+  };
+};
 
 
 const ActiveApplicationList: React.FC = () => {
@@ -71,7 +93,7 @@ const ActiveApplicationList: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentFlowId, setCurrentFlowId] = useState<number | null>(null);
   const { flowAPI } = useFlowApi();
-  const { authData } = useAuth();
+  const { authData } = useAuth(); // << 3. Pobranie danych o zalogowanym użytkowniku
   const [infoModal, setInfoModal] = useState({
     isOpen: false,
     message: "",
@@ -81,34 +103,36 @@ const ActiveApplicationList: React.FC = () => {
     ["ROLE_SUPERADMIN", "ROLE_ADMINISTRATOR"].includes(role)
   );
 
-  // Określenie uprawnień
+  const userDepartmentId = authData?.team?.department?.id ?? null;
+
   const canDelete =
     authData?.roles?.includes("ROLE_SUPERADMIN") ||
     authData?.department?.name === "Przedstawiciel medyczny";
 
-  // Pobieranie danych aplikacji
   useEffect(() => {
     const fetchApplications = async () => {
       try {
         const response = await flowAPI.getApplications();
         setApplications(
           response
-            .map((item: any) => ({
-              id: item.id,
-              name: `${item.user.name} ${item.user.surname}`,
-              flowStatus:
-                item.clientFlowStatuses?.[0]?.flowStatus?.name,
-              department:
-                item.clientFlowStatuses?.[0]?.department?.name,
-              createdAt: formatDate(item.createdAt),
-              approverName: item.user?.user
-                ? `${item.user.user.name} ${item.user.user.surname}`
-                : "Brak danych",
+            .map((item: any) => {
+              // << 4. Użycie nowej funkcji
+              const displayStatus = determineDisplayStatus(item.clientFlowStatuses, userDepartmentId);
+              return {
+                id: item.id,
+                name: `${item.user.name} ${item.user.surname}`,
+                flowStatus: displayStatus.flowStatus,
+                department: displayStatus.department,
+                createdAt: formatDate(item.createdAt),
+                approverName: item.user?.user
+                  ? `${item.user.user.name} ${item.user.user.surname}`
+                  : "Brak danych",
 
-              nip: item.rpwdlNip || item.gusNIP,
-              clientName: item.rpwdlName || item.gusName,
-              clientFlowStatuses: item.clientFlowStatuses, // zapisujemy wszystkie statusy
-            }))
+                nip: item.rpwdlNip || item.gusNIP,
+                clientName: item.rpwdlName || item.gusName,
+                clientFlowStatuses: item.clientFlowStatuses,
+              }
+            })
             .sort((a: { createdAt: any; id: number }, b: { createdAt: string; id: number }) => {
               if (a.createdAt === b.createdAt) {
                 return b.id - a.id;
@@ -124,27 +148,27 @@ const ActiveApplicationList: React.FC = () => {
     fetchApplications();
   }, []);
 
-  // Odświeżanie aplikacji
   const refreshApps = async () => {
     try {
       const response = await flowAPI.getApplications(false, true);
       setApplications(
-        response.map((item: any) => ({
-          id: item.id,
-          name: `${item.user.name} ${item.user.surname}`,
-          flowStatus: item.flowStatus.name,
-          department:
-            item.clientFlowStatuses?.[0]?.department?.name ||
-            "Brak departamentu",
-          createdAt: formatDate(item.createdAt),
-          approverName: item.user?.user
-            ? `${item.user.user.name} ${item.user.user.surname}`
-            : "Brak danych",
+        response.map((item: any) => {
+          const displayStatus = determineDisplayStatus(item.clientFlowStatuses, userDepartmentId);
+          return {
+            id: item.id,
+            name: `${item.user.name} ${item.user.surname}`,
+            flowStatus: displayStatus.flowStatus,
+            department: displayStatus.department,
+            createdAt: formatDate(item.createdAt),
+            approverName: item.user?.user
+              ? `${item.user.user.name} ${item.user.user.surname}`
+              : "Brak danych",
 
-          nip: item.rpwdlNip || item.gusNIP,
-          clientName: item.rpwdlName || item.gusName,
-          clientFlowStatuses: item.clientFlowStatuses,
-        }))
+            nip: item.rpwdlNip || item.gusNIP,
+            clientName: item.rpwdlName || item.gusName,
+            clientFlowStatuses: item.clientFlowStatuses,
+          }
+        })
       );
 
       setInfoModal({
@@ -160,7 +184,6 @@ const ActiveApplicationList: React.FC = () => {
     }
   };
 
-  // Obsługa akcji dla wierszy tabeli (kontynuuj, anuluj)
   const handleRowAction = (action: string, rowData: any) => {
     if (action === "continue") {
       window.location.href = `/flow/continue/${rowData.id}`;
@@ -186,7 +209,6 @@ const ActiveApplicationList: React.FC = () => {
     }
   };
 
-  // Definicja kolumn tabeli
   const columns = [
     { label: "Imię i nazwisko", field: "name" },
     { label: "Status wniosku", field: "flowStatus" },
@@ -195,8 +217,6 @@ const ActiveApplicationList: React.FC = () => {
     { label: "ID wniosku", field: "id" },
     { label: "NIP", field: "nip" },
     { label: "Nazwa klienta", field: "clientName" },
-    // { label: "Osoba zatwierdzająca", field: "approverName" },
-
     {
       label: "Akcje",
       field: "actions",
@@ -215,81 +235,21 @@ const ActiveApplicationList: React.FC = () => {
                 tabIndex={isAdminOrSuperAdmin ? -1 : 0}
                 aria-disabled={isAdminOrSuperAdmin}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <line x1="5" y1="12" x2="19" y2="12"></line> <polyline points="12 5 19 12 12 19"></polyline> </svg>
               </button>
             </span>
           </Tippy>
 
-          {/* Tooltip z listą statusów */}
-          <Tippy
-            content={renderStatusesTooltip(rowData.clientFlowStatuses, rowData.id, authData?.department?.uuid)}
-
-            interactive={true}
-            delay={[0, 0]}
-            arrow={true}
-            theme="light"
-          >
-            <button
-              type="button"
-              className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12" y2="8"></line>
-              </svg>
+          <Tippy content={renderStatusesTooltip(rowData.clientFlowStatuses, rowData.id)} interactive={true} delay={[0, 0]} arrow={true} theme="light" >
+            <button type="button" className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <circle cx="12" cy="12" r="10"></circle> <line x1="12" y1="16" x2="12" y2="12"></line> <line x1="12" y1="8" x2="12" y2="8"></line> </svg>
             </button>
           </Tippy>
 
-
-
-
           {canDelete && (
             <Tippy content="Anuluj wniosek" delay={[0, 0]} arrow={true} theme="light">
-              <button
-                type="button"
-                onClick={() => handleRowAction("cancel", rowData)}
-                className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                  <line x1="10" y1="11" x2="10" y2="17"></line>
-                  <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
+              <button type="button" onClick={() => handleRowAction("cancel", rowData)} className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg" >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <polyline points="3 6 5 6 21 6"></polyline> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path> <line x1="10" y1="11" x2="10" y2="17"></line> <line x1="14" y1="11" x2="14" y2="17"></line> </svg>
               </button>
             </Tippy>
           )}
@@ -301,19 +261,16 @@ const ActiveApplicationList: React.FC = () => {
   return (
     <>
       <nav className="relative flex w-full flex-wrap items-center justify-between font-bold uppercase bg-neutral-100 py-2 text-neutral-500 shadow-lg lg:py-4">
-        <div className="flex w-full flex-wrap items-center justify-between px-5">
+        <div className="flex w-full flex-wrap items-center justify-between px-5 mt-10">
           <div className="basis-1/4">Lista aktywnych wniosków</div>
-          <div className="basis-1/9">
+          {/* <div className="basis-1/9">
             <Tippy content="Odśwież listę wniosków" delay={[0, 0]} arrow={true} theme="light">
-              <button
-                onClick={refreshApps}
-                className="transition duration-150 uppercase ease-in-out hover:bg-primary-700 hover:shadow-lg focus:bg-primary-700 bg-primary rounded shadow text-md p-2 flex items-center space-x-2 cursor-pointer justify-center text-white"
-              >
+              <button onClick={refreshApps} className="transition duration-150 uppercase ease-in-out hover:bg-primary-700 hover:shadow-lg focus:bg-primary-700 bg-primary rounded shadow text-md p-2 flex items-center space-x-2 cursor-pointer justify-center text-white" >
                 <ArrowClockwise />
                 <span>Odśwież listę</span>
               </button>
             </Tippy>
-          </div>
+          </div> */}
         </div>
       </nav>
 

@@ -172,13 +172,10 @@ export default function CollectSamplesFromClientAddressesCollectionField({
     );
 }
 
-/** 
- * Podsumowanie w trybie read-only – wspiera też dane z `collectionData` i `refsMap`, jeśli field.value puste.
- */
+
 function renderSummary(field: any, collectionData: any[] = [], refsMap?: any) {
     let addresses: any[] = [];
 
-    // 🧠 Naprawa: jeśli value jest stringiem (np. "[Array(15)]") – zignoruj
     if (Array.isArray(field.value)) {
         addresses = field.value;
     } else if (typeof field.value === "string") {
@@ -257,39 +254,45 @@ function renderPeriodsSummary(addr: any) {
         "collectSamplesFromClientAddressCollectCitoPeriods",
     ];
 
-    return fieldsToRender
-        .map((fieldKey) => {
-            const periods = addr[fieldKey];
-            if (!Array.isArray(periods) || periods.length === 0) return null;
+    const formatTime = (timeStr: string | undefined): string => {
+        if (!timeStr) return 'Brak';
+        if (timeStr.includes('T')) {
+            try {
+                return timeStr.substring(11, 16);
+            } catch {
+                return timeStr;
+            }
+        }
+        return timeStr;
+    }
 
+    const dayTranslations: { [key: string]: string } = {
+        monday: "Pon",
+        tuesday: "Wt",
+        wednesday: "Śr",
+        thursday: "Czw",
+        friday: "Pt",
+        saturday: "Sob",
+        sunday: "Niedz",
+    };
 
-            const transformedPeriods = periods.map((p: any) => [
-                { name: "fromDayOfWeek", value: p.fromDayOfWeek },
-                { name: "toDayOfWeek", value: p.toDayOfWeek },
-                { name: "fromTime", value: p.fromTime },
-                { name: "toTime", value: p.toTime },
-            ]);
+    return fieldsToRender.map((fieldKey) => {
+        const periods = addr[fieldKey];
+        if (!Array.isArray(periods) || periods.length === 0) return null;
 
-            return (
-                <div key={fieldKey} className="mb-2">
-                    <CollectionPeriodsField
-                        disabled={true}
-                        field={{
-                            name: fieldKey,
-                            label: formatPeriodLabel(fieldKey),
-                            value: transformedPeriods,
-                            template: [
-                                { name: "fromDayOfWeek", type: "enum" },
-                                { name: "toDayOfWeek", type: "enum" },
-                                { name: "fromTime", type: "time" },
-                                { name: "toTime", type: "time" },
-                            ],
-                        }}
-                    />
+        return (
+            <div key={fieldKey} className="mt-1">
+                <h5 className="font-semibold text-xs text-gray-600">{formatPeriodLabel(fieldKey)}</h5>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    {periods.map((p, index) => (
+                        <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">
+                            {`${dayTranslations[p.fromDayOfWeek] || p.fromDayOfWeek} - ${dayTranslations[p.toDayOfWeek] || p.toDayOfWeek}: ${formatTime(p.fromTime)} - ${formatTime(p.toTime)}`}
+                        </span>
+                    ))}
                 </div>
-            );
-        })
-        .filter(Boolean);
+            </div>
+        );
+    }).filter(Boolean);
 }
 
 

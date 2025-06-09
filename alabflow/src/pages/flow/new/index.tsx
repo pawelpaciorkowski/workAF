@@ -1,4 +1,6 @@
-import React, { createRef, useCallback, useEffect, useRef, useState } from "react";
+// w pliku: alabflow/src/pages/flow/new/index.tsx
+
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { StageGroupType, StageType } from "../../../_types";
 import { Asterisk } from "react-bootstrap-icons";
 import { useFlowApi } from "../../../_hooks/flowAPI";
@@ -11,14 +13,11 @@ import PrevStagesComponent from "./PrevStagesComponent";
 import DefaultStageComponent from "./DefaultStageComponent";
 import { useFinalStageModal } from "../../../_hooks/modals";
 
-/**
- * Komponent do tworzenia nowego przepływu.
- * @param {Object} props - Właściwości komponentu.
- * @param {Function} props.createFlow - Funkcja do utworzenia nowego przepływu.
- * @param {string} props.flowID - ID przepływu, jeśli istnieje.
- * @returns {JSX.Element} Element do tworzenia nowego przepływu.
- */
+// --- DODANO: Lokalna definicja typu dla słownika ---
+type DictionaryMap = Record<number, string>;
+
 function CreateNewFlowComponent({ createFlow, flowID }: any) {
+  // ... (bez zmian)
   return (
     <div className="block rounded bg-white text-neutral-700 p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.2),0_10px_20px_-2px_rgba(0,0,0,0.1)]">
       <h3 className="mb-2 text-xl font-medium leading-tight">
@@ -29,7 +28,7 @@ function CreateNewFlowComponent({ createFlow, flowID }: any) {
       <button
         onClick={() => createFlow()}
         type="button"
-        className="inline-block rounded bg-primary px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-white shadow-[0_4px_9px_-4px_#3b71ca] transition duration-150 ease-in-out hover:bg-primary-600 hover:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)] focus:bg-primary-600 focus:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)] focus:outline-none focus:ring-0 active:bg-primary-700 active:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)] dark:shadow-[0_4px_9px_-4px_rgba(59,113,202,0.5)] dark:hover:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.2),0_4px_18px_0_rgba(59,113,202,0.1)] dark:focus:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.2),0_4px_18px_0_rgba(59,113,202,0.1)] dark:active:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.2),0_4px_18px_0_rgba(59,113,202,0.1)]"
+        className="inline-block rounded bg-primary px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-white shadow-[0_4px_9px_-4px_#3b71ca] transition duration-150 ease-in-out hover:bg-primary-600 hover:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)] focus:bg-primary-600 focus:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)] focus:outline-none focus:ring-0 active:bg-primary-700 active:shadow-[0_8px_9px_-4px_rgba(59,113,202,0.3),0_4px_18px_0_rgba(59,113,202,0.2)]"
         data-twe-ripple-init
         data-twe-ripple-color="light"
       >
@@ -39,10 +38,7 @@ function CreateNewFlowComponent({ createFlow, flowID }: any) {
   );
 }
 
-/**
- * Główny komponent do zarządzania nowym przepływem.
- * @returns {JSX.Element} Element przepływu.
- */
+
 export default function FlowNew() {
   const { flowID } = useParams();
   const {
@@ -53,6 +49,9 @@ export default function FlowNew() {
     getFlowClientGroups,
   } = useFlowApi();
   const navigate = useNavigate();
+
+  const [laboratoriesData, setLaboratoriesData] = useState<DictionaryMap>({});
+  const [principalsData, setPrincipalsData] = useState<DictionaryMap>({});
 
   const [activeStageGroup, setActiveStageGroup] = useState<StageGroupType | undefined>(undefined);
   const [validationError, setValidationError] = useState<any>([]);
@@ -67,12 +66,46 @@ export default function FlowNew() {
   const isFinalizedRef = useRef<boolean>(false);
   const [nestedErrorsContext, setNestedErrorsContext] = useState<string[]>([]);
 
-
-
   const { isFinalStageModalOpen, setIsFinalStageModalOpen, modalContent } = useFinalStageModal(
     flowData,
     activeStage
   );
+
+  // --- POPRAWIONA SEKCJA: Pobieranie słowników ---
+  useEffect(() => {
+    const fetchDictionaries = async () => {
+      try {
+        const [labResponse, prinResponse] = await Promise.all([
+          flowAPI.getDictionaryByName("laboratories"),
+          flowAPI.getDictionaryByName("principals")
+        ]);
+
+        if (labResponse && labResponse.data) {
+          const labMap: DictionaryMap = {};
+          labResponse.data.forEach((item: any) => {
+            labMap[item.id] = `[${item.symbol}], ${item.name}, MPK-${item.mpk}`;
+          });
+          setLaboratoriesData(labMap);
+        }
+
+        if (prinResponse && prinResponse.data) {
+          const prinMap: DictionaryMap = {};
+          prinResponse.data.forEach((item: any) => {
+            prinMap[item.id] = `[${item.label}], ${item.name}`;
+          });
+          setPrincipalsData(prinMap);
+        }
+      } catch (error) {
+        console.error("Błąd podczas pobierania słowników:", error);
+      }
+    };
+
+    // Uruchomienie tylko raz, gdy flowAPI jest dostępne
+    if (flowAPI) {
+      fetchDictionaries();
+    }
+  }, []); // Zależność tylko od `flowAPI`, które jest stabilne
+
 
   useEffect(() => {
     if (isFinalStageModalOpen) {
@@ -80,11 +113,6 @@ export default function FlowNew() {
     }
   }, [isFinalStageModalOpen]);
 
-
-
-  /**
-   * Funkcja do normalizacji `flowClientGroups` – zawsze zwraca tablicę.
-   */
   const normalizedFlowClientGroups = useCallback(
     () =>
       Array.isArray(flowClientGroups)
@@ -93,11 +121,6 @@ export default function FlowNew() {
     [flowClientGroups]
   );
 
-  /**
-   * Funkcja do uzyskania grupy etapu na podstawie obiektu etapu, korzystająca z normalizacji.
-   * @param {StageType} stage - Etap, dla którego chcemy pobrać grupę.
-   * @returns {StageGroupType | null} - Dopasowana grupa etapu lub null.
-   */
   const getStageGroup = useCallback(
     (stage: StageType) => {
       const flowGroupsArray = normalizedFlowClientGroups();
@@ -108,11 +131,8 @@ export default function FlowNew() {
     [normalizedFlowClientGroups]
   );
 
-  /**
-   * Funkcja do pobierania HTML aplikacji.
-   * @returns {Promise<AxiosResponse | null>} Odpowiedź API lub null w przypadku błędu.
-   */
   const downloadApplicationHtml = useCallback(async () => {
+    // ... bez zmian
     if (!flowData?.id) {
       return null;
     }
@@ -127,18 +147,12 @@ export default function FlowNew() {
     }
   }, [flowData?.id, flowAPI]);
 
-  /**
-   * Wywołanie pobrania grup przepływu.
-   * Przy każdej zmianie aktywnego etapu resetujemy błędy walidacji.
-   */
   useEffect(() => {
     getFlowClientGroups();
   }, [activeStage, getFlowClientGroups]);
 
-  /**
-   * Funkcja do tworzenia nowego przepływu lub pobrania istniejącego.
-   */
   const createFlow = async () => {
+    // ... bez zmian
     try {
       const response = flowID
         ? await flowAPI.getFlowConfig(flowID)
@@ -154,8 +168,8 @@ export default function FlowNew() {
     }
   };
 
-
   const injectMissingStages = useCallback(() => {
+    // ... bez zmian
     if (!flowData?.flow || !flowData?.flowStatuses) return [];
 
     const currentStageIdsFromStatuses = flowData.flowStatuses
@@ -177,13 +191,8 @@ export default function FlowNew() {
     return missingStages;
   }, [flowData?.flow, flowData?.flowStatuses]);
 
-
-  /**
-   * Funkcja ustawia aktualny etap na podstawie danych w `flowData`.
-   * Zwraca zparsowany obiekt etapu (Fields -> JSON).
-   * @returns {StageType | undefined} Zwraca etap lub undefined, jeśli nie znaleziono.
-   */
   const getStage = useCallback((): StageType | undefined => {
+    // ... bez zmian
     if (!flowData?.flow || !flowData?.flowStatuses) return;
 
     const userDeptId =
@@ -193,7 +202,6 @@ export default function FlowNew() {
 
     const allStages = [...flowData.flow, ...injectMissingStages()];
 
-    // Tworzymy mapę: stageId => stageGroupId
     const stageToGroupMap = allStages.reduce((acc, stage) => {
       acc[stage.stage] = stage.stageGroupId ?? 9999;
       return acc;
@@ -215,12 +223,11 @@ export default function FlowNew() {
       .filter((status: { statusName: string; }) =>
         ["nowy", "w trakcie uzupełniania"].includes(status.statusName)
       )
-      .sort((a: { groupId: number; }, b: { groupId: number; }) => a.groupId - b.groupId); // najmniejszy (czyli najwcześniejszy) najpierw
+      .sort((a: { groupId: number; }, b: { groupId: number; }) => a.groupId - b.groupId);
 
-    // Szukamy pierwszego najwcześniejszego etapu należącego do użytkownika
     const activeStatus = editableStatuses.find(
       (s: { deptId: any; }) => s.deptId === userDeptId
-    ) || editableStatuses[0]; // fallback: cokolwiek, żeby nie było undefined
+    ) || editableStatuses[0];
 
     if (!activeStatus || !activeStatus.stageId) {
       return;
@@ -242,13 +249,8 @@ export default function FlowNew() {
     return foundStage;
   }, [flowData, injectMissingStages]);
 
-
-
-
-  /**
-   * Ustawienie etapu w komponencie – wywołanie w momencie zmiany danych `flowData`.
-   */
   useEffect(() => {
+    // ... bez zmian
     const currentStage = getStage();
     if (!currentStage) return;
 
@@ -277,11 +279,8 @@ export default function FlowNew() {
   }, [flowData, getStage, getStageGroup, activeStage?.stage]);
 
 
-  /**
-   * Funkcja resetuje Flow do wybranego etapu i ustawia flowData.
-   * @param {string} stageId - ID etapu, do którego chcemy się cofnąć.
-   */
   function resetFlowToStage(stageId: string) {
+    // ... bez zmian
     flowAPI
       .resetFlow(flowData.id, stageId)
       .then((r: AxiosResponse) => {
@@ -299,23 +298,17 @@ export default function FlowNew() {
       });
   }
 
-  /**
-   * Funkcja do walidacji i formatowania danych formularza.
-   * @param {Record<string, any>} data - Dane z formularza.
-   * @param {Record<string, any>} fieldsMetadata - Metadane pól formularza (attr).
-   * @returns {Record<string, any>} Uporządkowane dane (stringi, tablice, pliki, encje itp.).
-   */
   const validateAndFormatData = (
     data: Record<string, any>,
     fieldsMetadata: Record<string, any>
   ) => {
+    // ... bez zmian
     const formattedData: Record<string, any> = { ...data };
 
     Object.keys(formattedData).forEach((key) => {
       const value = formattedData[key];
       const fieldMetadata = fieldsMetadata[key] || {};
 
-      // Przykład: pole wielokrotnego wyboru typu "resultReceiveTypes"
       if (key === "resultReceiveTypes") {
         formattedData[key] = Array.isArray(value)
           ? value
@@ -323,7 +316,6 @@ export default function FlowNew() {
             ? [value]
             : [];
       } else if (Array.isArray(value)) {
-        // Obsługa tablic plików / innych encji
         if (fieldMetadata.collectionType === "file") {
           formattedData[key] = value.map((item) => ({
             filename: item.filename,
@@ -333,13 +325,11 @@ export default function FlowNew() {
           formattedData[key] = value.map(String);
         }
       } else if (value instanceof File) {
-        // Pojedynczy plik
         formattedData[key] = {
           filename: value.name,
           content: value,
         };
       } else if (fieldMetadata.collectionType === "entity") {
-        // Jeśli to kolekcja encji, wrzucamy w tablicę
         formattedData[key] =
           value !== null && value !== undefined ? [value] : [];
       } else if (typeof value === "object" && value !== null) {
@@ -352,33 +342,22 @@ export default function FlowNew() {
     return formattedData;
   };
 
-  /**
-   * Obsługa zdarzenia wysłania formularza dla "zwykłych" etapów.
-   * @param {React.FormEvent<HTMLFormElement>} event
-   * @param {any} collectionData - dodatkowe dane (np. słowniki) do dołączenia w zapytaniu.
-   */
   const handleSubmit = (
     event: React.FormEvent<HTMLFormElement>,
     collectionData: any
   ) => {
+    // ... (bez zmian)
     event.preventDefault();
     if (isSubmitting || !activeStage) return;
     setIsSubmitting(true);
 
     const rawFormData = {
-      ...globalFormData, // dane z poprzednich etapów (np. groupOfPayers z 4_1)
+      ...globalFormData,
       ...getFormKeyAndValues(event, activeStage.fields),
 
     };
 
-
     const currentFormState = { ...globalFormData, ...rawFormData };
-
-
-    activeStage.fields.forEach((field) => {
-      const visible = fieldCanBeVisible(field, currentFormState);
-    });
-
 
     const visibleFields = activeStage.fields.filter(field =>
       fieldCanBeVisible(field, currentFormState)
@@ -388,7 +367,6 @@ export default function FlowNew() {
       acc[field.name] = currentFormState[field.name];
       return acc;
     }, {});
-
 
     const fieldsMetadata = visibleFields.reduce<Record<string, any>>((acc, field) => {
       acc[field.name] = field.attr || {};
@@ -411,16 +389,13 @@ export default function FlowNew() {
           const context = response.data.context;
           let errors: string[] = [];
 
-          // 1. Błędy ogólne (np. ["Należy dodać minimum jedno laboratorium"])
           if (Array.isArray(context) && context.length && Array.isArray(context[0]) && typeof context[0][0] === "string") {
-            errors = context[0]; // wrzuć stringi
+            errors = context[0];
             setNestedErrorsContext([]);
           }
-          // 2. Błędy pól (np. [{ fieldName: ["komunikat"] }])
           else if (Array.isArray(context)) {
             errors = context.flatMap((errObj) => {
               if (typeof errObj === "object" && errObj !== null) {
-                // Każdy obiekt: { pole: ["błąd"] }
                 return Object.entries(errObj).flatMap(([field, msgs]) =>
                   Array.isArray(msgs) ? msgs.map(msg => ` ${msg}`) : []
                 );
@@ -429,16 +404,12 @@ export default function FlowNew() {
             });
             setNestedErrorsContext([]);
           }
-          // 3. Fallback – nieznany format (dla świętego spokoju)
           else {
             errors = ["Wystąpił nieznany błąd walidacji."];
             setNestedErrorsContext([]);
           }
-
           setValidationError(errors);
         }
-
-
       })
       .catch((error: any) => {
         console.error("❌ Błąd zapisu etapu:", error.response?.data || error);
@@ -446,15 +417,10 @@ export default function FlowNew() {
       .finally(() => {
         setIsSubmitting(false);
       });
-
   };
 
-
-  /**
-   * Funkcja wywoływana przez etapy specjalne (kontrolowane), np. SpecialStageComponent.
-   * @param {object} formObj - Dane z formularza.
-   */
   const saveControlledForm = (formObj: object) => {
+    // ... (bez zmian)
     if (!activeStage) return;
 
     const flowId = flowData.id;
@@ -475,16 +441,13 @@ export default function FlowNew() {
           const context = r.data.context;
           let errors: string[] = [];
 
-          // 1. Błędy ogólne (np. ["Należy dodać minimum jedno laboratorium"])
           if (Array.isArray(context) && context.length && Array.isArray(context[0]) && typeof context[0][0] === "string") {
-            errors = context[0]; // wrzuć stringi
+            errors = context[0];
             setNestedErrorsContext([]);
           }
-          // 2. Błędy pól (np. [{ fieldName: ["komunikat"] }])
           else if (Array.isArray(context)) {
             errors = context.flatMap((errObj) => {
               if (typeof errObj === "object" && errObj !== null) {
-                // Każdy obiekt: { pole: ["błąd"] }
                 return Object.entries(errObj).flatMap(([field, msgs]) =>
                   Array.isArray(msgs) ? msgs.map(msg => ` ${msg}`) : []
                 );
@@ -493,7 +456,6 @@ export default function FlowNew() {
             });
             setNestedErrorsContext([]);
           }
-          // 3. Fallback – nieznany format (dla świętego spokoju)
           else {
             errors = ["Wystąpił nieznany błąd walidacji."];
             setNestedErrorsContext([]);
@@ -524,10 +486,8 @@ export default function FlowNew() {
       });
   };
 
-
-
-
   useEffect(() => {
+    // ... bez zmian
     if (!flowData?.flowStatuses || !activeStageGroup) return;
 
     const usedStageIds = new Set<string>();
@@ -547,18 +507,17 @@ export default function FlowNew() {
     setPreviousStages(filtered);
   }, [flowData, activeStageGroup]);
 
-
   const handleSetActiveStageGroup = (stageGroup: StageGroupType) => {
+    // ... (bez zmian)
     if (activeStageGroup && stageGroup.id < activeStageGroup.id) {
       setStageToChange(stageGroup);
       setIsModalOpen(true);
     }
   };
 
-
   const confirmStageChange = () => {
+    // ... (bez zmian)
     if (stageToChange) {
-      // Usunięcie z previousStages tych, które są po wybranej grupie
       setPreviousStages(
         previousStages.filter((pStage) => pStage.stageGroupId < stageToChange.id)
       );
@@ -569,6 +528,7 @@ export default function FlowNew() {
   };
 
   useEffect(() => {
+    // ... bez zmian
     if (isFinalStageModalOpen) {
       setActiveStage(null);
       setActiveStageGroup(undefined);
@@ -587,30 +547,26 @@ export default function FlowNew() {
         <div className="grid grid-cols-3 gap-4">
           <div className={activeStageGroup ? "col-span-2" : "col-span-3"}>
             {isFinalStageModalOpen ? null : activeStageGroup && Object.keys(activeStageGroup).length > 0 ? (
-
               <>
                 {previousStages.length > 0 && (
+                  // --- POPRAWIONA SEKCJA: Przekazanie słowników do komponentu podsumowania ---
                   <PrevStagesComponent
                     stages={previousStages}
                     flowStageGroups={flowClientGroups}
+                    laboratoriesData={laboratoriesData}
+                    principalsData={principalsData}
                   />
                 )}
 
                 <div className="block rounded bg-white text-neutral-700 p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.2),0_10px_20px_-2px_rgba(0,0,0,0.1)]">
                   {validationError && validationError.length > 0 && (
-                    <div
-                      className="mb-4 rounded-lg bg-warning-100 px-6 py-5 text-base text-warning-700"
-                      role="alert"
-                    >
+                    <div className="mb-4 rounded-lg bg-warning-100 px-6 py-5 text-base text-warning-700" role="alert" >
                       <h4 className="mb-2 font-bold leading-tight">
                         Popraw błędy walidacji w poniższych polach!
                       </h4>
                       <ul className="w-96">
                         {validationError.map((fieldName: string) => (
-                          <li
-                            key={fieldName}
-                            className="w-full text-sm border-b-2 border-warning-300 border-opacity-100 py-2"
-                          >
+                          <li key={fieldName} className="w-full text-sm border-b-2 border-warning-300 border-opacity-100 py-2" >
                             {fieldName}
                           </li>
                         ))}
@@ -667,7 +623,6 @@ export default function FlowNew() {
                         errors={validationError}
                         setValidationError={setValidationError}
                       />
-
                     )
                   ) : (
                     <div>Nie wybrano etapu lub etap jest specjalny.</div>
@@ -675,12 +630,12 @@ export default function FlowNew() {
                 </div>
               </>
             ) : (
-
               <CreateNewFlowComponent createFlow={createFlow} flowID={flowID} />
             )}
           </div>
 
           {activeStageGroup && (
+            // ... (reszta komponentu bez zmian)
             <div>
               <div className="block sticky md:top-[133px] rounded bg-white text-neutral-700 p-2 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.2),0_10px_20px_-2px_rgba(0,0,0,0.1)]">
                 <h5 className="mb-2 mt-3 ml-3 text-xl font-medium leading-tight">
@@ -739,6 +694,7 @@ export default function FlowNew() {
       </div>
 
       {isSubmitting && (
+        // ... (bez zmian)
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-8 rounded shadow">
             <div className="mb-4">
