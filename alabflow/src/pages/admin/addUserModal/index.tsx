@@ -19,6 +19,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
   const [isEmployerDisabled, setIsEmployerDisabled] = useState(true);
   const [passwordError, setPasswordError] = useState("");
   const [flows, setFlows] = useState<{ id: number; name: string }[]>([]);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const { flowAPI } = useFlowApi();
   const authAPI = new AuthAPI();
@@ -265,7 +266,6 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
       return;
     }
 
-    // Używamy TYLKO ID zespołu (zgodnie z API!)
     const user = {
       email: formData.email,
       name: formData.name,
@@ -277,12 +277,40 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
       flows: formData.selectedFlow ? [formData.selectedFlow] : [],
     };
 
+
+
     try {
       const addedUser = await authAPI.addUser(user);
       onUserAdded(addedUser);
-      onClose();
-    } catch (error) {
-      console.error("Błąd podczas dodawania użytkownika:", error);
+      handleModalClose();
+    } catch (error: any) {
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+
+        if (errorData.context && Array.isArray(errorData.context) && errorData.context.length > 0) {
+          const errorMessages = [];
+          for (const errorObject of errorData.context) {
+            for (const field in errorObject) {
+              if (Array.isArray(errorObject[field])) {
+                for (const message of errorObject[field]) {
+                  errorMessages.push(`${field}: ${message}`);
+                }
+              }
+            }
+          }
+
+          if (errorMessages.length > 0) {
+            setServerError(errorMessages.join(' '));
+          } else {
+            setServerError("Wystąpił błąd walidacji. Sprawdź poprawność danych.");
+          }
+        } else {
+          const fallbackError = errorData.message || errorData.detail || "Wystąpił nieznany błąd serwera.";
+          setServerError(fallbackError);
+        }
+      } else {
+        setServerError("Błąd podczas dodawania użytkownika. Spróbuj ponownie.");
+      }
     }
   };
 
@@ -292,6 +320,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
     <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50">
       <div className="bg-white p-4 rounded shadow-lg w-1/3">
         <h2 className="text-xl mb-4 font-bold">Dodaj użytkownika</h2>
+        {serverError && (
+          <div className="mb-4 text-red-600 font-semibold">
+            {serverError}
+          </div>
+        )}
 
         {/* Ogólny komunikat o błędach */}
         {Object.values(errors).some(Boolean) && (

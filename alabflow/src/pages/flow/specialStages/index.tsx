@@ -93,6 +93,7 @@ type SpecialStageComponentProps = {
   handleSubmit: (event: React.FormEvent<HTMLFormElement>, payload: Record<string, any>) => void;
   errors: string[];
   setValidationError: React.Dispatch<React.SetStateAction<string[]>>;
+  onFormChange: (data: Record<string, any>) => void;
 };
 
 
@@ -104,6 +105,7 @@ export function SpecialStageComponent({
   handleSubmit,
   errors,
   setValidationError,
+  onFormChange,
 }: SpecialStageComponentProps) {
   const collectedFormData = useRef<Record<string, any>>({ ...globalFormData });
 
@@ -203,11 +205,12 @@ export function SpecialStageComponent({
                 setValidationError={setValidationError}
               />
             );
+          // Nowa, poprawna wersja
           case "files":
             return (
               <FilesSpecialStageComponent
                 stage={activeStage}
-                collectFormData={collectFormData}
+                onFormChange={onFormChange}
                 globalFormData={globalFormData}
                 handleSubmit={handleSubmit}
                 errors={errors}

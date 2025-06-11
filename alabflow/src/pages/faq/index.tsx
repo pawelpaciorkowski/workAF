@@ -16,12 +16,12 @@ const FAQ: React.FC<{}> = () => {
               <p className="text-gray-500 dark:text-gray-400">
                 Aby zalogować się, wejdź na stronę{" "}
                 <a
-                  href="http://10.1.252.81:8880/"
+                  href="https://alabflow.alab.com.pl"
                   target="_blank"
                   rel="noreferrer"
                   className="font-medium underline text-primary-600 dark:text-primary-500 hover:no-underline"
                 >
-                  http://10.1.252.81:8880/
+                  https://alabflow.alab.com.pl/
                 </a>
                 . Wprowadź swój e-mail i hasło, a następnie kliknij "Zaloguj
                 się". Jeśli zapomniałeś hasła, kliknij "Zapomniałem hasła" i

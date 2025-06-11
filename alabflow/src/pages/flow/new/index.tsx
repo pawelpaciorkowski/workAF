@@ -63,10 +63,19 @@ export default function FlowNew() {
   const isFinalizedRef = useRef<boolean>(false);
   const [nestedErrorsContext, setNestedErrorsContext] = useState<string[]>([]);
 
+
   const { isFinalStageModalOpen, setIsFinalStageModalOpen, modalContent } = useFinalStageModal(
     flowData,
     activeStage
   );
+
+  // ZMIANA 1: Dodaj tę funkcję do centralnego zarządzania stanem
+  const handleGlobalFormChange = useCallback((newData: Record<string, any>) => {
+    setGlobalFormData((prevData: any) => ({
+      ...prevData,
+      ...newData,
+    }));
+  }, []);
 
   useEffect(() => {
     const fetchDictionaries = async () => {
@@ -269,7 +278,6 @@ export default function FlowNew() {
 
 
   function resetFlowToStage(stageId: string) {
-    // ... bez zmian
     flowAPI
       .resetFlow(flowData.id, stageId)
       .then((r: AxiosResponse) => {
@@ -595,6 +603,8 @@ export default function FlowNew() {
                         flowData={flowData}
                         formData={globalFormData}
                         setFormData={setGlobalFormData}
+                        globalFormData={globalFormData}
+                        onFormChange={handleGlobalFormChange}
                       />
                     ) : (
                       <SpecialStageComponent
@@ -605,6 +615,7 @@ export default function FlowNew() {
                         handleSubmit={handleSubmit}
                         errors={validationError}
                         setValidationError={setValidationError}
+                        onFormChange={handleGlobalFormChange}
                       />
                     )
                   ) : (
