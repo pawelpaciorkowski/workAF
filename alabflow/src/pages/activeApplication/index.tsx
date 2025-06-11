@@ -1,14 +1,26 @@
-// alabflow/src/pages/activeApplication/index.tsx
-
 import React, { useEffect, useState } from "react";
 import AdvancedTable from "../../globalComponents/advancedTable";
 import { Modal } from "../../pages/flow/list/processList/confirmModal";
 import { ArrowClockwise } from "react-bootstrap-icons";
 import { useFlowApi } from "../../_hooks/flowAPI";
-import { useAuth } from "../../_hooks/auth"; // << 1. Import useAuth
+import { useAuth } from "../../_hooks/auth";
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
+
+// ### ZAKTUALIZOWANA MAPA RÓL I DEPARTAMENTÓW ###
+const ROLE_TO_DEPARTMENT_MAP: { [key: string]: string } = {
+  'ROLE_SALES_REPRESENTATIVE': 'Sprzedaż',
+  'ROLE_SETTLEMENT': 'Rozliczenia',
+  'ROLE_MEDICAL': 'Medyczny',
+  'ROLE_HL7': 'HL7',
+  'ROLE_LOGISTICS': 'Logistyka',
+  'ROLE_SUPPLY': 'Zaopatrzenie',
+  'ROLE_IT': 'IT',
+  'ROLE_COMPETITION': 'Konkursy',
+  'ROLE_ACCOUNTING': 'Księgowość',
+};
+
 
 const formatDate = (dateString: string | number | Date) => {
   const date = new Date(dateString);
@@ -21,6 +33,7 @@ const statusColorMap: { [key: string]: string } = {
   "zatwierdzony": "text-green-500",
   "odrzucony": "text-red-500",
   "w trakcie uzupełniania przez inny dział": "text-purple-500",
+  "rozliczeniowy": "text-indigo-500",
 };
 
 const renderStatusesTooltip = (statuses: any[], flowId: number) => {
@@ -48,37 +61,17 @@ const renderStatusesTooltip = (statuses: any[], flowId: number) => {
   );
 };
 
-// << 2. Nowa funkcja do określania statusu do wyświetlenia
 const determineDisplayStatus = (statuses: any[], userDepartmentId: number | null) => {
   if (!statuses || statuses.length === 0) {
     return { flowStatus: "Brak statusu", department: "Brak danych" };
   }
-
-  // Priorytet 1: Znajdź status dla działu zalogowanego użytkownika, jeśli jest aktywny
-  if (userDepartmentId) {
-    const userSpecificStatus = statuses.find(
-      (s) => s.department?.id === userDepartmentId && s.flowStatus?.isEditable
-    );
-    if (userSpecificStatus) {
-      return {
-        flowStatus: userSpecificStatus.flowStatus.name,
-        department: userSpecificStatus.department.name,
-      };
-    }
-  }
-
-  // Priorytet 2: Znajdź pierwszy status "nowy" lub "w trakcie"
-  const firstActiveStatus = statuses.find(
-    (s) => s.flowStatus?.isEditable
-  );
+  const firstActiveStatus = statuses.find((s) => s.flowStatus?.isEditable);
   if (firstActiveStatus) {
     return {
       flowStatus: firstActiveStatus.flowStatus.name,
       department: firstActiveStatus.department.name,
     };
   }
-
-  // Priorytet 3: Jeśli wszystko jest zatwierdzone, pokaż ostatni status (prawdopodobnie "zatwierdzony")
   const lastStatus = statuses[statuses.length - 1];
   return {
     flowStatus: lastStatus.flowStatus.name,
@@ -93,7 +86,7 @@ const ActiveApplicationList: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentFlowId, setCurrentFlowId] = useState<number | null>(null);
   const { flowAPI } = useFlowApi();
-  const { authData } = useAuth(); // << 3. Pobranie danych o zalogowanym użytkowniku
+  const { authData } = useAuth();
   const [infoModal, setInfoModal] = useState({
     isOpen: false,
     message: "",
@@ -109,67 +102,72 @@ const ActiveApplicationList: React.FC = () => {
     authData?.roles?.includes("ROLE_SUPERADMIN") ||
     authData?.department?.name === "Przedstawiciel medyczny";
 
+  const canUserContinueFlow = (statuses: any[]): boolean => {
+    if (!statuses || statuses.length === 0 || !authData?.roles) {
+      return false;
+    }
+
+    const userDepartments = authData.roles.map((role: string | number) => ROLE_TO_DEPARTMENT_MAP[role]).filter(Boolean);
+
+    if (userDepartments.length === 0) {
+      return false;
+    }
+
+    const canContinue = statuses.some(status =>
+      status.flowStatus?.isEditable && userDepartments.includes(status.department?.name)
+    );
+
+    return canContinue;
+  };
+
+  const mapApplications = (response: any[]) => {
+    return response
+      .map((item: any) => {
+        const displayStatus = determineDisplayStatus(item.clientFlowStatuses, userDepartmentId);
+        const canContinue = canUserContinueFlow(item.clientFlowStatuses);
+
+        return {
+          id: item.id,
+          name: `${item.user.name} ${item.user.surname}`,
+          flowStatus: displayStatus.flowStatus,
+          department: displayStatus.department,
+          createdAt: formatDate(item.createdAt),
+          approverName: item.user?.user
+            ? `${item.user.user.name} ${item.user.user.surname}`
+            : "Brak danych",
+          nip: item.rpwdlNip || item.gusNIP,
+          clientName: item.rpwdlName || item.gusName,
+          clientFlowStatuses: item.clientFlowStatuses,
+          canContinue: canContinue,
+        };
+      })
+      .sort((a: { createdAt: any; id: number }, b: { createdAt: string; id: number }) => {
+        if (a.createdAt === b.createdAt) {
+          return b.id - a.id;
+        }
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  };
+
   useEffect(() => {
     const fetchApplications = async () => {
       try {
         const response = await flowAPI.getApplications();
-        setApplications(
-          response
-            .map((item: any) => {
-              // << 4. Użycie nowej funkcji
-              const displayStatus = determineDisplayStatus(item.clientFlowStatuses, userDepartmentId);
-              return {
-                id: item.id,
-                name: `${item.user.name} ${item.user.surname}`,
-                flowStatus: displayStatus.flowStatus,
-                department: displayStatus.department,
-                createdAt: formatDate(item.createdAt),
-                approverName: item.user?.user
-                  ? `${item.user.user.name} ${item.user.user.surname}`
-                  : "Brak danych",
-
-                nip: item.rpwdlNip || item.gusNIP,
-                clientName: item.rpwdlName || item.gusName,
-                clientFlowStatuses: item.clientFlowStatuses,
-              }
-            })
-            .sort((a: { createdAt: any; id: number }, b: { createdAt: string; id: number }) => {
-              if (a.createdAt === b.createdAt) {
-                return b.id - a.id;
-              }
-              return b.createdAt.localeCompare(a.createdAt);
-            })
-        );
+        setApplications(mapApplications(response));
       } catch (error) {
         console.error("Error fetching applications:", error);
       }
     };
 
-    fetchApplications();
+    if (authData) {
+      fetchApplications();
+    }
   }, []);
 
   const refreshApps = async () => {
     try {
       const response = await flowAPI.getApplications(false, true);
-      setApplications(
-        response.map((item: any) => {
-          const displayStatus = determineDisplayStatus(item.clientFlowStatuses, userDepartmentId);
-          return {
-            id: item.id,
-            name: `${item.user.name} ${item.user.surname}`,
-            flowStatus: displayStatus.flowStatus,
-            department: displayStatus.department,
-            createdAt: formatDate(item.createdAt),
-            approverName: item.user?.user
-              ? `${item.user.user.name} ${item.user.user.surname}`
-              : "Brak danych",
-
-            nip: item.rpwdlNip || item.gusNIP,
-            clientName: item.rpwdlName || item.gusName,
-            clientFlowStatuses: item.clientFlowStatuses,
-          }
-        })
-      );
+      setApplications(mapApplications(response));
 
       setInfoModal({
         isOpen: true,
@@ -220,41 +218,50 @@ const ActiveApplicationList: React.FC = () => {
     {
       label: "Akcje",
       field: "actions",
-      render: (rowData: any) => (
-        <div className="flex space-x-2">
-          <Tippy content={isAdminOrSuperAdmin ? "Administrator nie może kontynuować wniosku" : "Kontynuuj wniosek"} delay={[0, 0]} arrow={true} theme="light">
-            <span style={{ display: "inline-block" }}>
-              <button
-                type="button"
-                onClick={() => handleRowAction("continue", rowData)}
-                className={
-                  "message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg" +
-                  (isAdminOrSuperAdmin ? " opacity-50 cursor-not-allowed" : "")
-                }
-                disabled={isAdminOrSuperAdmin}
-                tabIndex={isAdminOrSuperAdmin ? -1 : 0}
-                aria-disabled={isAdminOrSuperAdmin}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <line x1="5" y1="12" x2="19" y2="12"></line> <polyline points="12 5 19 12 12 19"></polyline> </svg>
-              </button>
-            </span>
-          </Tippy>
+      render: (rowData: any) => {
+        const shouldBeDisabled = isAdminOrSuperAdmin || !rowData.canContinue;
+        const tooltipContent = isAdminOrSuperAdmin
+          ? "Administrator nie może kontynuować wniosku"
+          : !rowData.canContinue
+            ? "Wniosek oczekuje na akcję w innym dziale lub nie masz uprawnień"
+            : "Kontynuuj wniosek";
 
-          <Tippy content={renderStatusesTooltip(rowData.clientFlowStatuses, rowData.id)} interactive={true} delay={[0, 0]} arrow={true} theme="light" >
-            <button type="button" className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <circle cx="12" cy="12" r="10"></circle> <line x1="12" y1="16" x2="12" y2="12"></line> <line x1="12" y1="8" x2="12" y2="8"></line> </svg>
-            </button>
-          </Tippy>
+        return (
+          <div className="flex space-x-2">
+            <Tippy content={tooltipContent} delay={[0, 0]} arrow={true} theme="light">
+              <span style={{ display: "inline-block" }}>
+                <button
+                  type="button"
+                  onClick={() => handleRowAction("continue", rowData)}
+                  className={
+                    "message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg" +
+                    (shouldBeDisabled ? " opacity-50 cursor-not-allowed" : "")
+                  }
+                  disabled={shouldBeDisabled}
+                  tabIndex={shouldBeDisabled ? -1 : 0}
+                  aria-disabled={shouldBeDisabled}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <line x1="5" y1="12" x2="19" y2="12"></line> <polyline points="12 5 19 12 12 19"></polyline> </svg>
+                </button>
+              </span>
+            </Tippy>
 
-          {canDelete && (
-            <Tippy content="Anuluj wniosek" delay={[0, 0]} arrow={true} theme="light">
-              <button type="button" onClick={() => handleRowAction("cancel", rowData)} className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg" >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <polyline points="3 6 5 6 21 6"></polyline> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path> <line x1="10" y1="11" x2="10" y2="17"></line> <line x1="14" y1="11" x2="14" y2="17"></line> </svg>
+            <Tippy content={renderStatusesTooltip(rowData.clientFlowStatuses, rowData.id)} interactive={true} delay={[0, 0]} arrow={true} theme="light" >
+              <button type="button" className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <circle cx="12" cy="12" r="10"></circle> <line x1="12" y1="16" x2="12" y2="12"></line> <line x1="12" y1="8" x2="12" y2="8"></line> </svg>
               </button>
             </Tippy>
-          )}
-        </div>
-      ),
+
+            {canDelete && (
+              <Tippy content="Anuluj wniosek" delay={[0, 0]} arrow={true} theme="light">
+                <button type="button" onClick={() => handleRowAction("cancel", rowData)} className="message-btn inline-block rounded-full border border-primary bg-primary text-white p-1.5 uppercase leading-normal shadow transition duration-150 ease-in-out hover:shadow-lg" >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" > <polyline points="3 6 5 6 21 6"></polyline> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path> <line x1="10" y1="11" x2="10" y2="17"></line> <line x1="14" y1="11" x2="14" y2="17"></line> </svg>
+                </button>
+              </Tippy>
+            )}
+          </div>
+        )
+      },
     },
   ];
 
@@ -263,14 +270,6 @@ const ActiveApplicationList: React.FC = () => {
       <nav className="relative flex w-full flex-wrap items-center justify-between font-bold uppercase bg-neutral-100 py-2 text-neutral-500 shadow-lg lg:py-4">
         <div className="flex w-full flex-wrap items-center justify-between px-5 mt-10">
           <div className="basis-1/4">Lista aktywnych wniosków</div>
-          {/* <div className="basis-1/9">
-            <Tippy content="Odśwież listę wniosków" delay={[0, 0]} arrow={true} theme="light">
-              <button onClick={refreshApps} className="transition duration-150 uppercase ease-in-out hover:bg-primary-700 hover:shadow-lg focus:bg-primary-700 bg-primary rounded shadow text-md p-2 flex items-center space-x-2 cursor-pointer justify-center text-white" >
-                <ArrowClockwise />
-                <span>Odśwież listę</span>
-              </button>
-            </Tippy>
-          </div> */}
         </div>
       </nav>
 

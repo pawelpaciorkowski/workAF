@@ -1,5 +1,3 @@
-// w pliku: alabflow/src/pages/flow/new/index.tsx
-
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { StageGroupType, StageType } from "../../../_types";
 import { Asterisk } from "react-bootstrap-icons";
@@ -13,11 +11,9 @@ import PrevStagesComponent from "./PrevStagesComponent";
 import DefaultStageComponent from "./DefaultStageComponent";
 import { useFinalStageModal } from "../../../_hooks/modals";
 
-// --- DODANO: Lokalna definicja typu dla słownika ---
 type DictionaryMap = Record<number, string>;
 
 function CreateNewFlowComponent({ createFlow, flowID }: any) {
-  // ... (bez zmian)
   return (
     <div className="block rounded bg-white text-neutral-700 p-6 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.2),0_10px_20px_-2px_rgba(0,0,0,0.1)]">
       <h3 className="mb-2 text-xl font-medium leading-tight">
@@ -47,6 +43,7 @@ export default function FlowNew() {
     setFlowData,
     flowClientGroups,
     getFlowClientGroups,
+    invalidateApplicationsCache
   } = useFlowApi();
   const navigate = useNavigate();
 
@@ -71,7 +68,6 @@ export default function FlowNew() {
     activeStage
   );
 
-  // --- POPRAWIONA SEKCJA: Pobieranie słowników ---
   useEffect(() => {
     const fetchDictionaries = async () => {
       try {
@@ -100,11 +96,10 @@ export default function FlowNew() {
       }
     };
 
-    // Uruchomienie tylko raz, gdy flowAPI jest dostępne
     if (flowAPI) {
       fetchDictionaries();
     }
-  }, []); // Zależność tylko od `flowAPI`, które jest stabilne
+  }, []);
 
 
   useEffect(() => {
@@ -132,7 +127,6 @@ export default function FlowNew() {
   );
 
   const downloadApplicationHtml = useCallback(async () => {
-    // ... bez zmian
     if (!flowData?.id) {
       return null;
     }
@@ -152,7 +146,6 @@ export default function FlowNew() {
   }, [activeStage, getFlowClientGroups]);
 
   const createFlow = async () => {
-    // ... bez zmian
     try {
       const response = flowID
         ? await flowAPI.getFlowConfig(flowID)
@@ -169,7 +162,6 @@ export default function FlowNew() {
   };
 
   const injectMissingStages = useCallback(() => {
-    // ... bez zmian
     if (!flowData?.flow || !flowData?.flowStatuses) return [];
 
     const currentStageIdsFromStatuses = flowData.flowStatuses
@@ -184,15 +176,13 @@ export default function FlowNew() {
         stage: stageId,
         fields: [],
         name: `Etap ${stageId} (uzupełniony)`,
-        description: "Automatycznie dodany etap – brak w flow",
-        stageGroupId: 9999, // placeholder
+
       }));
 
     return missingStages;
   }, [flowData?.flow, flowData?.flowStatuses]);
 
   const getStage = useCallback((): StageType | undefined => {
-    // ... bez zmian
     if (!flowData?.flow || !flowData?.flowStatuses) return;
 
     const userDeptId =
@@ -250,7 +240,6 @@ export default function FlowNew() {
   }, [flowData, injectMissingStages]);
 
   useEffect(() => {
-    // ... bez zmian
     const currentStage = getStage();
     if (!currentStage) return;
 
@@ -302,7 +291,6 @@ export default function FlowNew() {
     data: Record<string, any>,
     fieldsMetadata: Record<string, any>
   ) => {
-    // ... bez zmian
     const formattedData: Record<string, any> = { ...data };
 
     Object.keys(formattedData).forEach((key) => {
@@ -381,6 +369,7 @@ export default function FlowNew() {
       .then((response: any) => {
 
         if (response.statusText === "OK") {
+          invalidateApplicationsCache();
           if (!isFinalizedRef.current) {
             setFlowData(response.data);
           } else {
@@ -420,7 +409,6 @@ export default function FlowNew() {
   };
 
   const saveControlledForm = (formObj: object) => {
-    // ... (bez zmian)
     if (!activeStage) return;
 
     const flowId = flowData.id;
@@ -487,7 +475,6 @@ export default function FlowNew() {
   };
 
   useEffect(() => {
-    // ... bez zmian
     if (!flowData?.flowStatuses || !activeStageGroup) return;
 
     const usedStageIds = new Set<string>();
@@ -508,7 +495,6 @@ export default function FlowNew() {
   }, [flowData, activeStageGroup]);
 
   const handleSetActiveStageGroup = (stageGroup: StageGroupType) => {
-    // ... (bez zmian)
     if (activeStageGroup && stageGroup.id < activeStageGroup.id) {
       setStageToChange(stageGroup);
       setIsModalOpen(true);
@@ -516,7 +502,6 @@ export default function FlowNew() {
   };
 
   const confirmStageChange = () => {
-    // ... (bez zmian)
     if (stageToChange) {
       setPreviousStages(
         previousStages.filter((pStage) => pStage.stageGroupId < stageToChange.id)
@@ -528,7 +513,6 @@ export default function FlowNew() {
   };
 
   useEffect(() => {
-    // ... bez zmian
     if (isFinalStageModalOpen) {
       setActiveStage(null);
       setActiveStageGroup(undefined);
@@ -549,7 +533,6 @@ export default function FlowNew() {
             {isFinalStageModalOpen ? null : activeStageGroup && Object.keys(activeStageGroup).length > 0 ? (
               <>
                 {previousStages.length > 0 && (
-                  // --- POPRAWIONA SEKCJA: Przekazanie słowników do komponentu podsumowania ---
                   <PrevStagesComponent
                     stages={previousStages}
                     flowStageGroups={flowClientGroups}
@@ -635,7 +618,6 @@ export default function FlowNew() {
           </div>
 
           {activeStageGroup && (
-            // ... (reszta komponentu bez zmian)
             <div>
               <div className="block sticky md:top-[133px] rounded bg-white text-neutral-700 p-2 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.2),0_10px_20px_-2px_rgba(0,0,0,0.1)]">
                 <h5 className="mb-2 mt-3 ml-3 text-xl font-medium leading-tight">
@@ -694,7 +676,6 @@ export default function FlowNew() {
       </div>
 
       {isSubmitting && (
-        // ... (bez zmian)
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-8 rounded shadow">
             <div className="mb-4">

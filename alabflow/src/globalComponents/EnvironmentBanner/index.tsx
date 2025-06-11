@@ -2,6 +2,7 @@ import React from "react";
 
 export const EnvironmentBanner = () => {
     const port = window.location.port;
+    const hostname = window.location.hostname;
 
     let label = "";
     let bannerStyle: React.CSSProperties = {
@@ -15,6 +16,10 @@ export const EnvironmentBanner = () => {
         fontWeight: "bold",
         textAlign: "center",
     };
+
+    if (hostname === "alabflow.alab.com.pl") {
+        return null;
+    }
 
     switch (port) {
         case "3000":
@@ -30,9 +35,13 @@ export const EnvironmentBanner = () => {
             bannerStyle.backgroundColor = "#2563eb";
             break;
         default:
-            label = "Korzystasz z aplikacji produkcyjnej";
-            bannerStyle.backgroundColor = "#16a34a";
+            // label = "Korzystasz z aplikacji produkcyjnej";
+            // bannerStyle.backgroundColor = "#16a34a";
             break;
+    }
+
+    if (label === "") {
+        return null;
     }
 
     return (

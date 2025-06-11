@@ -1,3 +1,5 @@
+// w pliku: src/_hooks/flowAPI/index.tsx
+
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { useAuth } from "../auth";
 import { useAlerts } from "../alerts";
@@ -16,6 +18,12 @@ export const FlowApiProvider = ({ children }: { children: React.ReactNode }) => 
         return new FlowAPI(authData, refreshToken, addAlert);
     }, [authData, refreshToken, addAlert]);
 
+    // --- POCZĄTEK ZMIAN: Nowa funkcja do czyszczenia cache ---
+    const invalidateApplicationsCache = () => {
+        console.log("Czyszczenie pamięci podręcznej dla listy wniosków...");
+        sessionStorage.removeItem("flowData");
+    };
+    // --- KONIEC ZMIAN ---
 
     const getFlowClientGroups = () => {
         if (flowClientGroups.length === 0) {
@@ -34,7 +42,8 @@ export const FlowApiProvider = ({ children }: { children: React.ReactNode }) => 
                 setFlowData,
                 flowAPI,
                 flowClientGroups,
-                getFlowClientGroups
+                getFlowClientGroups,
+                invalidateApplicationsCache // <-- Udostępniamy funkcję globalnie
             }
         },
         [flowData, flowAPI, flowClientGroups]

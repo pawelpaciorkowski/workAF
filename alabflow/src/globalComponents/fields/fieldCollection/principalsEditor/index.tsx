@@ -11,7 +11,7 @@ export type Principal = StageFieldType[];
 export interface SimplePrincipalsEditorProps {
   flowName: string;
   flowId: string | number;
-  stageId: string; // np. "304_1" lub "304_2"
+  stageId: string;
   onNext?: (payload: { principals: { symbol: string }[] }) => void;
 }
 
@@ -23,12 +23,37 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
 }) => {
   const { flowData, flowAPI, setFlowData } = useFlowApi();
   const [principals, setPrincipals] = useState<Principal[]>([]);
+  const navigate = useNavigate();
+  const [laboratoriesData, setLaboratoriesData] = useState<Record<string, string>>({});
+  const [principalsData, setPrincipalsData] = useState<Record<string, string>>({});
   const [isFilledModalOpen, setIsFilledModalOpen] = useState(false);
-  const [editableDepartments, setEditableDepartments] = useState<string[]>([]);
+  const [editableDepartments, setEditableDepartments] = useState<string[]>([]); // Pozostawiamy oryginalną logikę
   const [stageFieldValues, setStageFieldValues] = useState<Record<string, any>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (flowAPI) {
+      flowAPI.getDictionaryByName("laboratories").then((res: AxiosResponse) => {
+        if (res && res.data) {
+          const labMap = res.data.reduce((acc: any, item: any) => {
+            acc[item.id] = `[${item.symbol}] ${item.name}`;
+            return acc;
+          }, {});
+          setLaboratoriesData(labMap);
+        }
+      });
+      flowAPI.getDictionaryByName("principals").then((res: AxiosResponse) => {
+        if (res && res.data) {
+          const prinMap = res.data.reduce((acc: any, item: any) => {
+            acc[item.id] = `[${item.label}] ${item.name}`;
+            return acc;
+          }, {});
+          setPrincipalsData(prinMap);
+        }
+      });
+    }
+  }, [flowAPI]);
 
   const currentStage = useMemo(() => {
     return Array.isArray(flowData?.flow)
@@ -37,21 +62,14 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
   }, [flowData, stageId]);
 
   useEffect(() => {
-    if (!flowData && flowName && flowId) {
-      flowAPI
-        .getFlowConfig(flowId)
+    if (!flowData && flowName && flowId && flowAPI) {
+      flowAPI.getFlowConfig(flowId)
         .then((r: AxiosResponse) => {
-          if (r.status === 200) {
-            setFlowData(r.data);
-          } else {
-            console.error("❌ Nieoczekiwany status odpowiedzi:", r.status);
-          }
+          if (r.status === 200) setFlowData(r.data);
         })
-        .catch((error: any) => {
-          console.error("❌ Błąd przy pobieraniu flowData:", error);
-        });
+        .catch((error: any) => console.error("❌ Błąd przy pobieraniu flowData:", error));
     }
-  }, [flowData, flowName, flowId]);
+  }, [flowData, flowName, flowId, flowAPI, setFlowData]);
 
   useEffect(() => {
     if (!isWaitingForResponse && isSubmitted && flowData?.flowStatuses) {
@@ -75,54 +93,23 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
           )
           .filter((name: any): name is string => !!name?.trim());
 
-        // setEditableDepartments([...new Set(editable)]);
+        setEditableDepartments(Array.from(new Set(editable)));
       }
     }
   }, [isSubmitted, flowData, isWaitingForResponse]);
 
-  function flattenCollectionData(collection: StageFieldType[][]): Record<string, any>[] {
-    return collection.map((entry) => {
-      const flatEntry: Record<string, any> = {};
-
-      entry.forEach((field) => {
-        flatEntry[field.name] = field.value;
-      });
-
-      return flatEntry;
-    });
-  }
-
-
   useEffect(() => {
     if (!currentStage?.fields) return;
-    const field = currentStage.fields.find(
-      (f: any) => f.name === "principalLaboratories"
-    );
-
-    const collectionField = currentStage.fields.find(
-      (field: any) =>
-        field.name === "principalLaboratories"
-    );
-
-    if (!collectionField) return;
-
-    const value = Array.isArray(collectionField.value) ? collectionField.value : [];
-
-    if (value.length > 0) {
-      // dane przychodzą z backendu jako tablica tablic pól (Field[][])
-      setPrincipals(value);
+    const collectionField = currentStage.fields.find((field: any) => field.name === "principalLaboratories");
+    if (collectionField && Array.isArray(collectionField.value) && collectionField.value.length > 0) {
+      setPrincipals(collectionField.value);
     }
-
   }, [currentStage]);
-
-
-
 
   const handleSymbolChange = (principalIndex: number, fieldName: string, newValue: string) => {
     setPrincipals((prev) =>
       prev.map((principal, i) => {
         if (i !== principalIndex) return principal;
-
         return principal.map((field) =>
           field.name === fieldName ? { ...field, value: newValue } : field
         );
@@ -130,15 +117,19 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
     );
   };
 
-
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!onNext) return;
+
+    const flattenCollectionData = (collection: StageFieldType[][]): Record<string, any>[] => {
+      return collection.map((entry) => {
+        const flatEntry: Record<string, any> = {};
+        entry.forEach((field) => { flatEntry[field.name] = field.value; });
+        return flatEntry;
+      });
+    }
+
     const payload: any = { ...stageFieldValues };
-
-    const hasSymbols = principals.some((principal) =>
-      principal.some((field) => field.name === "symbol")
-    );
-
     const payloadPrincipalLaboratories = flattenCollectionData(principals)
       .filter((row) => row.symbol?.toString().trim() !== "");
 
@@ -146,23 +137,16 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
       payload.principalLaboratories = payloadPrincipalLaboratories;
     }
 
-
-
-
-
-
-    if (onNext) {
-      setIsWaitingForResponse(true);
-      try {
-        await onNext(payload);
-        const updatedFlowData = await flowAPI.getFlowConfig(flowId);
-        setFlowData(updatedFlowData.data);
-        setIsSubmitted(true);
-      } catch (error) {
-        console.error("❌ Błąd podczas wysyłania danych:", error);
-      } finally {
-        setIsWaitingForResponse(false);
-      }
+    setIsWaitingForResponse(true);
+    try {
+      await onNext(payload);
+      const updatedFlowData = await flowAPI.getFlowConfig(flowId);
+      setFlowData(updatedFlowData.data);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error("❌ Błąd podczas wysyłania danych:", error);
+    } finally {
+      setIsWaitingForResponse(false);
     }
   };
 
@@ -172,41 +156,27 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
 
   return (
     <form onSubmit={handleSubmit}>
-      {/* Render tylko dla 304_1 */}
       {currentStage.stage === "304_1" &&
         currentStage.fields.map((field: any) => {
           if (field.name === "principals") return null;
-
           return (
             <div key={field.name} className="mb-4">
               <MatchFields
                 field={field}
                 disabled={false}
                 required={field.attr?.required || false}
-                value={{
-                  value:
-                    stageFieldValues[field.name] ??
-                    field.value ??
-                    field.attr?.defaultValue ??
-                    "",
-                }}
+                value={{ value: stageFieldValues[field.name] ?? field.value ?? field.attr?.defaultValue ?? "" }}
                 changeEvent={(changedData: Record<string, any>) => {
-                  const newVal = changedData[field.name];
-                  setStageFieldValues((prev) => ({
-                    ...prev,
-                    [field.name]: newVal,
-                  }));
+                  setStageFieldValues((prev) => ({ ...prev, ...changedData }));
                 }}
               />
             </div>
           );
         })}
 
-      {/* Render tylko dla 304_2 */}
       {principals.length > 0 &&
         principals.map((principal, index) => {
           const title = `Przypisanie ${index + 1}`;
-
           return (
             <div key={index} className="mb-4 border border-gray-300 p-4 rounded">
               <div className="font-bold mb-2">{title}</div>
@@ -228,7 +198,16 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
                       </div>
                     );
                   }
-
+                  let displayValue;
+                  const value = field.value;
+                  const isKeyable = typeof value === 'string' || typeof value === 'number';
+                  if (field.name === 'laboratory' && isKeyable) {
+                    displayValue = laboratoriesData[value] || `ID: ${value}`;
+                  } else if (field.name === 'principal' && isKeyable) {
+                    displayValue = principalsData[value] || `ID: ${value}`;
+                  } else {
+                    displayValue = String(value ?? "");
+                  }
                   return (
                     <div key={field.name}>
                       <label className="text-xs text-gray-500">{field.label}</label>
@@ -236,11 +215,7 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
                         type="text"
                         readOnly
                         className="w-full bg-gray-100 border border-gray-300 rounded px-2 py-1"
-                        value={
-                          typeof field.value === "object"
-                            ? JSON.stringify(field.value)
-                            : String(field.value ?? "")
-                        }
+                        value={displayValue}
                       />
                     </div>
                   );
@@ -250,7 +225,6 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
           );
         })}
 
-      {/* Modal */}
       {isFilledModalOpen && (
         <GlobalModal
           isOpen={isFilledModalOpen}
@@ -259,11 +233,7 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
             <div>
               <p>Twój wniosek został wypełniony. Prosimy o kontynuację w działach:</p>
               <ul className="list-disc list-inside text-blue-600 font-semibold mt-2">
-                {editableDepartments.length > 0 ? (
-                  editableDepartments.map((dept, i) => <li key={i}>{dept}</li>)
-                ) : (
-                  <li>Nieznany dział</li>
-                )}
+                {editableDepartments.map((dept: string, i) => <li key={i}>{dept}</li>)}
               </ul>
             </div>
           }
@@ -289,6 +259,3 @@ const SimplePrincipalsEditor: React.FC<SimplePrincipalsEditorProps> = ({
 };
 
 export default SimplePrincipalsEditor;
-
-
-

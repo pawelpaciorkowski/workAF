@@ -1,8 +1,9 @@
 import axios from "axios";
 
 const apiInstance = axios.create({
-  // baseURL: "http://10.1.252.81:8137/api/",
-  baseURL: "http://10.1.252.81:18137/api/",
+
+  baseURL: "https://api-alabflow.alab.com.pl/api",
+  // baseURL: "http://10.1.252.81:18137/api/",
   // baseURL: "http://10.1.252.81:28137/api/",
 });
 

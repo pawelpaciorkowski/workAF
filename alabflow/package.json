@@ -15,6 +15,10 @@
     "@types/uuid": "^9.0.2",
     "axios": "^1.4.0",
     "chart.js": "^4.4.7",
+    "cypress": "^14.0.3",
+    "cypress-file-upload": "^5.0.8",
+    "eslint-plugin-cypress": "^4.1.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "framer-motion": "^11.15.0",
     "jwt-decode": "^3.1.2",
     "meilisearch": "^0.34.1",
@@ -63,10 +67,6 @@
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@types/react-transition-group": "^4.4.6",
-    "cypress": "^14.0.3",
-    "cypress-file-upload": "^5.0.8",
-    "eslint-plugin-cypress": "^4.1.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
     "fork-ts-checker-webpack-plugin": "^9.0.2",
     "tailwindcss": "^3.3.2"
   }
