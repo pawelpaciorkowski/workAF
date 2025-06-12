@@ -43,24 +43,76 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(""); // Zawsze czyść poprzednie błędy przed nową próbą
 
     if (!isValidEmail(email)) {
-      setError("Podaj poprawny adres email.");
-      setIsLoading(true);
+      setError("Podaj poprawny adres e-mail.");
+      setIsLoading(false);
       return;
     }
 
     if (email === "" || password === "") {
-      setError("Proszę wprowadzić email i hasło.");
-    } else {
-      try {
-        await login({ email, password });
-        window.location.reload();
-      } catch (error: any) {
-        setError(
-          error.message ||
-          "Wystąpił błąd podczas logowania. Proszę spróbować ponownie."
-        );
+      setError("Proszę wprowadzić e-mail i hasło.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await login({ email, password });
+      window.location.reload();
+    } catch (error: any) {
+      // === NOWA, PRECYZYJNA OBSŁUGA BŁĘDÓW ===
+
+      // Sprawdzamy, czy istnieje odpowiedź od serwera z danymi błędu
+      if (error.response && error.response.data) {
+        const errorData = error.response.data; // np. { code: 401, message: "Nieprawidłowe dane." }
+
+        // Sprawdzamy, czy odpowiedź ma oczekiwaną strukturę
+        if (errorData.code && errorData.message) {
+
+          // Używamy `switch` na kodzie błędu
+          switch (errorData.code) {
+            case 401: // Błąd autoryzacji
+              if (errorData.message === "Nieprawidłowe dane.") {
+                setError("Nieprawidłowy e-mail lub hasło. Spróbuj ponownie.");
+              } else {
+                // Jeśli dla kodu 401 przyjdzie inna wiadomość, wyświetl ją
+                setError(errorData.message);
+              }
+              break;
+
+            // Tutaj możesz dodać obsługę innych kodów błędów w przyszłości
+            case 403:
+              setError("Brak uprawnień. Skontaktuj się z administratorem.");
+              break;
+
+            case 500:
+              setError("Wystąpił błąd serwera. Spróbuj ponownie później.");
+              break;
+            case 503:
+              setError("Serwis jest niedostępny. Spróbuj ponownie później.");
+              break;
+            case 400:
+              setError("Błędne żądanie. Sprawdź dane i spróbuj ponownie.");
+              break;
+            case 429:
+              setError("Zbyt wiele prób logowania. Spróbuj ponownie później.");
+              break;
+            case 404:
+              setError("Nie znaleziono użytkownika o podanym e-mailu.");
+              break;
+
+            default:
+              setError(`Wystąpił błąd serwera (kod: ${errorData.code}). Spróbuj ponownie.`);
+              break;
+          }
+        } else {
+          // Fallback, jeśli struktura błędu jest inna niż oczekiwana
+          setError("Otrzymano nieoczekiwaną odpowiedź od serwera.");
+        }
+      } else {
+        // Fallback na wypadek problemów z siecią
+        setError("Błąd połączenia. Sprawdź internet i spróbuj ponownie.");
       }
     }
     setIsLoading(false);

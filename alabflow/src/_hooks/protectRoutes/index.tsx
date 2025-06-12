@@ -16,19 +16,15 @@ export const ProtectRoutes = () => {
                     <AlertsComponent />
                     <Outlet />
                 </div>
-                <footer className={'sticky'}>
-                    <div className={'p-3'}>
-                        <div
-                            className="block w-full rounded-lg bg-white text-left shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_10px_20px_-2px_rgba(0,0,0,0.04)]">
-                            <div className="p-3">
-                                <p className="text-base text-neutral-600">
-                                    AlabFlow - stopka
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </footer>
+
             </main>
+            <footer className="w-full bg-gray-100 border-t border-gray-300 mt-4">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-center items-center text-sm text-gray-600">
+                    <span>&copy; {new Date().getFullYear()} AlabFlow. Wszelkie prawa zastrzeżone. </span>
+
+                </div>
+            </footer>
+
         </>
         : <Navigate to='/login' />)
 };
