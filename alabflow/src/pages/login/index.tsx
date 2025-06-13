@@ -149,7 +149,7 @@ export default function Login() {
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-[#ffffff]">
-      <div className="bg-gray-100 shadow-xl rounded p-6 mt-10 w-1/4">
+      <div className="bg-gray-100 shadow-xl rounded p-6 mt-10 w-11/12 md:w-1/2 lg:w-1/3 xl:w-1/4">
         <div className="flex items-end mb-4 justify-center">
           <img src="/logoalab.png" alt="Logo Alab" className="w-20 h-20 mr-2" />
           <h1 className="text-2xl font-bold text-[#black]">AlabFlow</h1>

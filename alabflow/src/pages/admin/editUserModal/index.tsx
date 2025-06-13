@@ -197,7 +197,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({
   return (
     <>
       <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-70 z-50">
-        <div className="bg-white p-4 rounded shadow-lg w-1/3">
+        <div className="bg-white p-4 rounded shadow-lg w-11/12 md:w-3/4 lg:w-1/2 xl:w-1/3">
           <h2 className="text-xl mb-4 font-bold">Edytuj użytkownika</h2>
           <form onSubmit={handleSubmit}>
             <div className="mb-4">

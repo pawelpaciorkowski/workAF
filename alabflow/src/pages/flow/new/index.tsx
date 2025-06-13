@@ -49,7 +49,6 @@ export default function FlowNew() {
 
   const [laboratoriesData, setLaboratoriesData] = useState<DictionaryMap>({});
   const [principalsData, setPrincipalsData] = useState<DictionaryMap>({});
-
   const [activeStageGroup, setActiveStageGroup] = useState<StageGroupType | undefined>(undefined);
   const [validationError, setValidationError] = useState<any>([]);
   const [previousStages, setPreviousStages] = useState<StageType[] | []>([]);
@@ -62,12 +61,28 @@ export default function FlowNew() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isFinalizedRef = useRef<boolean>(false);
   const [nestedErrorsContext, setNestedErrorsContext] = useState<string[]>([]);
+  const { id, stageId: stageIdFromUrl } = useParams(); // 'id' to id wniosku, 'stageIdFromUrl' to id kroku z URL
 
 
   const { isFinalStageModalOpen, setIsFinalStageModalOpen, modalContent } = useFinalStageModal(
     flowData,
     activeStage
   );
+
+  const isStageCompleted = (stageId: string) => {
+    if (!flowData?.flowStatuses) return false;
+
+    // Uważamy etap za "odwiedzony", jeśli po prostu istnieje w jakiejkolwiek historii statusów.
+    // To pozwala na powrót do etapów, które nie zostały jeszcze formalnie "zatwierdzone".
+    const isVisited = flowData.flowStatuses.some((status: any) =>
+      status.stageHierarchy?.includes(stageId)
+    );
+
+    // Dodatkowo, upewnijmy się, że nie jest to bieżący, aktywny etap.
+    const isCurrent = activeStage?.stage === stageId;
+
+    return isVisited && !isCurrent;
+  };
 
   // ZMIANA 1: Dodaj tę funkcję do centralnego zarządzania stanem
   const handleGlobalFormChange = useCallback((newData: Record<string, any>) => {
@@ -156,17 +171,28 @@ export default function FlowNew() {
 
   const createFlow = async () => {
     try {
-      const response = flowID
-        ? await flowAPI.getFlowConfig(flowID)
-        : await flowAPI.getFlowConfig();
+      // 1. Zawsze tworzymy nowy wniosek
+      const response = await flowAPI.getFlowConfig();
 
       if (response.status === 200) {
-        setFlowData(response.data);
+        const newFlowData = response.data;
+
+        // 2. Pobieramy ID wniosku i pierwszego etapu z odpowiedzi API
+        const newFlowId = newFlowData.id;
+        const firstStageId = newFlowData.stageId;
+
+        // 3. NAJWAŻNIEJSZE: Przekierowujemy na nowy, pełny URL
+        // Opcja `replace: true` zamienia '/flow/create' w historii przeglądarki,
+        // dzięki czemu przycisk "wstecz" nie wróci do pustej strony tworzenia.
+        navigate(`/flow/continue/${newFlowId}/${firstStageId}`, { replace: true });
+
+        // 4. Ustawiamy dane w stanie, co spowoduje renderowanie formularza
+        setFlowData(newFlowData);
       } else {
         console.error(`❌ Unexpected response status: ${response.status}`);
       }
     } catch (error) {
-      console.error("Błąd podczas tworzenia/pobierania flow:", error);
+      console.error("Błąd podczas tworzenia flow:", error);
     }
   };
 
@@ -249,11 +275,15 @@ export default function FlowNew() {
   }, [flowData, injectMissingStages]);
 
   useEffect(() => {
+    if (!flowData) return;
+
     const currentStage = getStage();
     if (!currentStage) return;
 
-    if (!isFinalizedRef.current && currentStage.stage !== activeStage?.stage) {
+    // Resetuj/wypełnij dane formularza tylko, gdy faktycznie zmieniamy etap
+    if (currentStage.stage !== activeStage?.stage) {
 
+      // --- POCZĄTEK PRZYWRÓCONEJ LOGIKI Z TWOJEJ STAREJ WERSJI ---
       const relevantSteps = flowData.flow.filter(
         (step: any) => step.stageGroupId <= currentStage.stageGroupId
       );
@@ -267,14 +297,54 @@ export default function FlowNew() {
           }
         });
       });
-      setValidationError([]);
-      setGlobalFormData(defaultValues);
 
-      setActiveStage(currentStage);
-      const activeGroup = getStageGroup(currentStage);
-      if (activeGroup) setActiveStageGroup(activeGroup);
+      // Ustawiamy dane w formularzu na podstawie zebranych wartości
+      setGlobalFormData(defaultValues);
+      // --- KONIEC PRZYWRÓCONEJ LOGIKI ---
     }
-  }, [flowData, getStage, getStageGroup, activeStage?.stage]);
+
+    // Czyścimy błędy walidacji przy każdej zmianie/odświeżeniu etapu
+    setValidationError([]);
+
+    // Ustawiamy aktywny etap i grupę
+    setActiveStage(currentStage);
+    const activeGroup = getStageGroup(currentStage);
+    if (activeGroup) setActiveStageGroup(activeGroup);
+
+    // Synchronizujemy URL
+    if (flowData.id && currentStage.stage && stageIdFromUrl !== currentStage.stage) {
+      navigate(`/flow/continue/${flowData.id}/${currentStage.stage}`, { replace: true });
+    }
+    // Ważna zmiana w zależnościach, aby poprawnie reagować na zmianę etapu
+  }, [flowData, activeStage?.stage, getStage, getStageGroup, navigate, stageIdFromUrl]);
+
+  // useEffect(() => {
+  //   const currentStage = getStage();
+  //   if (!currentStage) return;
+
+  //   if (!isFinalizedRef.current && currentStage.stage !== activeStage?.stage) {
+
+  //     const relevantSteps = flowData.flow.filter(
+  //       (step: any) => step.stageGroupId <= currentStage.stageGroupId
+  //     );
+
+  //     const defaultValues: Record<string, any> = {};
+  //     relevantSteps.forEach((step: any) => {
+  //       step.fields.forEach((field: any) => {
+  //         const val = field.value ?? field.attr?.defaultValue;
+  //         if (field.name && val !== undefined) {
+  //           defaultValues[field.name] = val;
+  //         }
+  //       });
+  //     });
+  //     setValidationError([]);
+  //     setGlobalFormData(defaultValues);
+
+  //     setActiveStage(currentStage);
+  //     const activeGroup = getStageGroup(currentStage);
+  //     if (activeGroup) setActiveStageGroup(activeGroup);
+  //   }
+  // }, [flowData, getStage, getStageGroup, activeStage?.stage]);
 
 
   function resetFlowToStage(stageId: string) {
@@ -536,7 +606,7 @@ export default function FlowNew() {
       </nav>
 
       <div className="mx-5 my-5">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className={activeStageGroup ? "col-span-2" : "col-span-3"}>
             {isFinalStageModalOpen ? null : activeStageGroup && Object.keys(activeStageGroup).length > 0 ? (
               <>
@@ -637,47 +707,56 @@ export default function FlowNew() {
                 <div className="overflow-y-auto max-h-screen p-2">
                   <ol className="border-l border-neutral-300 dark:border-neutral-500">
                     {normalizedFlowClientGroups().map(
-                      (stageGroup: StageGroupType) => (
-                        <li
-                          key={stageGroup.id}
-                          onClick={() => {
-                            if (
-                              activeStageGroup &&
-                              stageGroup.id < activeStageGroup.id
-                            ) {
-                              handleSetActiveStageGroup(stageGroup);
-                            }
-                          }}
-                        >
-                          <div
-                            className={`flex-start flex items-center pt-3 ${activeStageGroup && stageGroup.id < activeStageGroup.id
-                              ? "cursor-pointer hover:translate-y-1 duration-300"
-                              : ""
-                              }`}
+                      (stageGroup: StageGroupType) => {
+                        // Sprawdzamy, czy pierwszy etap w grupie jest "zatwierdzony"
+                        const canBeRevertedTo = isStageCompleted(stageGroup.stages[0]);
+                        // Ustalamy, czy etap jest klikalny (musi być wcześniejszy I ukończony)
+                        const isClickable = activeStageGroup && stageGroup.id < activeStageGroup.id && canBeRevertedTo;
+
+                        return (
+                          <li
+                            key={stageGroup.id}
+                            onClick={() => {
+                              // Uruchom logikę cofania tylko, jeśli etap jest klikalny
+                              if (isClickable) {
+                                handleSetActiveStageGroup(stageGroup);
+                              }
+                            }}
                           >
                             <div
-                              className={`-ml-[5px] mr-3 h-[9px] w-[9px] rounded-full transition ease-in-out delay-150 ${activeStageGroup?.name === stageGroup.name
-                                ? "bg-blue-600"
-                                : "bg-neutral-500"
-                                }`}
-                            ></div>
-                            <p
-                              className={`font-bold transition ease-in-out delay-100 ${activeStageGroup?.name === stageGroup.name
-                                ? "text-blue-600"
-                                : "text-neutral-500"
+                              className={`flex-start flex items-center pt-3 ${isClickable
+                                ? "cursor-pointer hover:translate-y-1 duration-300"
+                                : "opacity-50 cursor-not-allowed" // Styl dla nieaktywnych etapów
                                 }`}
                             >
-                              {stageGroup.name}
-                            </p>
-                          </div>
-                          <div className="mb-6 ml-4 mt-2">
-                            <p className="mb-3 text-sm text-neutral-500">
-                              Krok {stageGroup.id}
-                            </p>
-                          </div>
-                        </li>
-                      )
+                              {/* Ikona postępu */}
+                              <div
+                                className={`-ml-[5px] mr-3 h-[9px] w-[9px] rounded-full transition ease-in-out delay-150 ${activeStageGroup?.name === stageGroup.name
+                                  ? "bg-blue-600" // Etap aktywny
+                                  : canBeRevertedTo
+                                    ? "bg-green-500" // Etap ukończony i klikalny
+                                    : "bg-neutral-500" // Etap nieukończony
+                                  }`}
+                              ></div>
+                              <p
+                                className={`font-bold transition ease-in-out delay-100 ${activeStageGroup?.name === stageGroup.name
+                                  ? "text-blue-600"
+                                  : "text-neutral-500"
+                                  }`}
+                              >
+                                {stageGroup.name}
+                              </p>
+                            </div>
+                            <div className="mb-6 ml-4 mt-2">
+                              <p className="mb-3 text-sm text-neutral-500">
+                                Krok {stageGroup.id}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      }
                     )}
+
                   </ol>
                 </div>
               </div>

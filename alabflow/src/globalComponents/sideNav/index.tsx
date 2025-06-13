@@ -22,6 +22,7 @@ export const SideNavComponent = () => {
   const [userDepartment, setUserDepartment] = useState("");
   const [userName, setUserName] = useState("");
   const [userSurname, setUserSurname] = useState("");
+  const isProduction = window.location.hostname === "alabflow.alab.com.pl";
 
   useEffect(() => {
     initTWE({ Sidenav, Ripple });
@@ -182,7 +183,7 @@ export const SideNavComponent = () => {
 
       <nav
         id="main-navbar"
-        className="z-50 fixed left-0 right-0 top-[40px] flex w-full items-center justify-between bg-zinc-700 py-[0.6rem] text-gray-500 shadow-lg xl:pl-60"
+        className={`z-50 fixed left-0 right-0 flex w-full items-center justify-between bg-zinc-700 py-[0.6rem] text-gray-500 shadow-lg xl:pl-60 ${isProduction ? 'top-0' : 'top-[40px]'}`}
         data-twe-navbar-ref
       >
 

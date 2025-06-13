@@ -7,7 +7,7 @@ const UserProfile = ({ user }: { user: any }) => {
     <div className="bg-white rounded-lg shadow-lg p-6 mx-auto mt-4">
       <div className="text-center">
         <PersonCircle className="text-8xl text-blue-500 mx-auto" />
-        <div className="mt-4 p-4 border border-gray-300 rounded-md w-1/3 mx-auto min-w-1/3 shadow-lg">
+        <div className="mt-4 p-4 border border-gray-300 rounded-md w-11/12 md:w-2/3 lg:w-1/2 xl:w-1/3 mx-auto shadow-lg">
           <div className="my-2">
             <label className="block font-semibold text-gray-600">ID:</label>
             <p className="text-gray-600">{user.id}</p>

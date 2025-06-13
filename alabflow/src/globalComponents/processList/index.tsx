@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus } from "react-bootstrap-icons";
+import { ListTask, PlusCircleFill } from "react-bootstrap-icons";
 import { useFlowApi } from "../../_hooks/flowAPI";
 
 interface Flow {
@@ -19,12 +19,12 @@ const ProcessList = () => {
         const response = await flowAPI.getFlows();
         setFlows(response);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Błąd podczas pobierania danych:", error);
       }
     };
 
     fetchData();
-  }, []);
+  }, [flowAPI]);
 
   const handleSearchInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchInputValue(event.target.value.toLowerCase());
@@ -36,45 +36,51 @@ const ProcessList = () => {
 
   return (
     <div>
-      {/* Górny pasek pozostaje bez zmian */}
       <nav className="relative flex w-full flex-wrap items-center justify-between font-bold uppercase bg-neutral-100 py-2 text-neutral-500 shadow-lg focus:text-neutral-700 dark:bg-neutral-300 lg:py-4">
-        <div className="flex w-full flex-wrap items-center justify-between px-5">
+        <div className="flex w-full flex-wrap items-center justify-between px-5 mt-8">
           <div>Lista Procesów</div>
           <input
             type="text"
             value={searchInputValue}
             onChange={handleSearchInputChange}
             placeholder="Wyszukaj proces..."
-            className="p-3 border border-gray-300 rounded-lg shadow-md w-full max-w-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300"
+            className="p-2 border border-gray-300 rounded-md shadow-sm w-full max-w-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 font-normal normal-case"
           />
         </div>
       </nav>
 
-      {/* Kafelki */}
-      <div className="p-6 bg-gray-50 min-h-screen">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Główna sekcja z kartami procesów */}
+      <div className="p-8 bg-gray-50 min-h-screen">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-blue-500"
+              className="bg-white rounded-xl shadow-lg p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">{item.name}</h3>
-                <div className="flex space-x-4">
-                  <Link
-                    to="/pages/activeApplicationList"
-                    className="flex-1 text-center px-6 py-3 bg-blue-600 text-white rounded-md text-lg hover:bg-blue-700 transition-colors duration-300"
-                  >
-                    Lista wniosków
-                  </Link>
-                  <Link
-                    to="/flow/create"
-                    className="flex-1 text-center px-6 py-3 bg-green-600 text-white rounded-md text-lg hover:bg-green-700 transition-colors duration-300"
-                  >
-                    Nowy Wniosek
-                  </Link>
+              {/* Sekcja z tytułem i opisem */}
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{item.name}</h3>
+                <p className="text-gray-500 text-sm mb-4">
+                  Zarządzaj wnioskami i twórz nowe dla tego procesu.
+                </p>
+              </div>
 
-                </div>
+              {/* Sekcja z przyciskami akcji */}
+              <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+                <Link
+                  to="/pages/activeApplicationList"
+                  className="text-blue-600 font-semibold hover:text-blue-800 transition-colors duration-200 flex items-center text-sm"
+                >
+                  <ListTask className="mr-2" />
+                  Lista wniosków
+                </Link>
+                <Link
+                  to="/flow/create"
+                  className="px-5 py-2 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition-transform duration-200 hover:scale-105 flex items-center text-sm"
+                >
+                  <PlusCircleFill className="mr-2" />
+                  Nowy Wniosek
+                </Link>
               </div>
             </div>
           ))}

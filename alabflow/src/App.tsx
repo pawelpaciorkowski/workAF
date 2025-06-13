@@ -40,7 +40,7 @@ export default function App() {
       <Route element={<ProtectRoutes />}>
         <Route path="/home" element={<Home />} />
         <Route path="/flow/create/" element={<FlowNew />} />
-        <Route path="/flow/continue/:flowID" element={<FlowNew />} />
+        <Route path="/flow/continue/:flowID/:stageId?" element={<FlowNew />} />
         <Route path="/pages/addUser" element={<AddUserForm />} />
         <Route path="/pages/profile" element={<Profile />} />
         <Route path="/pages/processList" element={<ProcessList />} />
